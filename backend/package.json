@@ -1,0 +1,22 @@
+{
+  "name": "bss-backend",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "python3 app.py",
+    "start": "python3 app.py",
+    "db:setup": "python3 -m backend.src.db.setup"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "pg": "^8.11.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "multer": "^1.4.5-lts.1",
+    "pdf-parse": "^1.1.1",
+    "express-async-errors": "^3.1.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  }
+}

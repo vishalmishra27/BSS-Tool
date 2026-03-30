@@ -1,0 +1,39 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pip install:*)",
+      "Bash(python3 -c \"import bcrypt; h=bcrypt.hashpw\\(b''kpmg1234'', bcrypt.gensalt\\(\\)\\).decode\\(\\); print\\(h\\)\")",
+      "Bash(python3 -c \"import psycopg2; conn = psycopg2.connect\\(host=''localhost'', port=5432, database=''bss_tool'', user=''postgres'', password=''postgres''\\); print\\(''DB connected''\\); conn.close\\(\\)\")",
+      "Bash(PGPASSWORD=postgres psql -U postgres -d bss_tool -c \":*)",
+      "Bash(python3 -:*)",
+      "Bash(npm run:*)",
+      "Bash(python3:*)",
+      "Bash(xargs kill:*)",
+      "Bash(curl -s http://localhost:5174)",
+      "Bash(curl -s http://localhost:3001/api/auth/users)",
+      "Bash(for file:*)",
+      "Bash(do)",
+      "Bash(echo \"=== $file ===\")",
+      "Read(//Users/vishalmishra/Downloads/bss-tool 2/**)",
+      "Bash(done)",
+      "Bash(cat:*)",
+      "Bash(kill -9 12260 12263)",
+      "Bash(kill -9 23231 23236)",
+      "Read(//Users/vishalmishra/Downloads/**)",
+      "Bash(curl -s http://localhost:5000/api/attention_areas)",
+      "Bash(curl -s http://localhost:5000/api/phases)",
+      "Bash(curl -s http://localhost:5000/api/workflow_nodes)",
+      "Bash(curl -s http://localhost:5000/api/project_overview)",
+      "Bash(curl -s -X PUT http://localhost:5001/api/checklist/67/status -H 'Content-Type: application/json' -d '{\"\"status\"\":\"\"complete\"\"}')",
+      "Bash(curl -s -X PUT http://localhost:5000/api/checklist/67/status -H 'Content-Type: application/json' -d '{\"\"status\"\":\"\"complete\"\"}')",
+      "Bash(curl -s http://localhost:5000/api/agent/alerts)",
+      "Bash(curl -s http://localhost:5000/api/data-agent/tables/checklist/schema)",
+      "Bash(pip3 install:*)",
+      "Bash(curl -s -X POST http://localhost:5001/api/data-agent/upload -F \"file=@/dev/null;filename=test.csv\")",
+      "Bash(curl -s -X POST http://localhost:5001/api/data-agent/chat -H \"Content-Type: application/json\" -d '{\"\"\"\"message\"\"\"\":\"\"\"\"list all tables\"\"\"\",\"\"\"\"history\"\"\"\":[],\"\"\"\"file_id\"\"\"\":null}')",
+      "Bash(curl -s -X POST http://localhost:5001/api/auth/login -H \"Content-Type: application/json\" -d '{\"\"\"\"username\"\"\"\":\"\"\"\"admin\"\"\"\",\"\"\"\"password\"\"\"\":\"\"\"\"admin\"\"\"\"}')",
+      "Bash(curl -s -X POST http://localhost:5001/api/auth/login -H \"Content-Type: application/json\" -d '{\"\"\"\"username\"\"\"\":\"\"\"\"prog_director\"\"\"\",\"\"\"\"password\"\"\"\":\"\"\"\"password\"\"\"\"}')",
+      "Bash(curl -s -X POST http://localhost:5001/api/auth/login -H \"Content-Type: application/json\" -d '{\"\"\"\"username\"\"\"\":\"\"\"\"prog_director\"\"\"\",\"\"\"\"password\"\"\"\":\"\"\"\"kpmg1234\"\"\"\"}')"
+    ]
+  }
+}
