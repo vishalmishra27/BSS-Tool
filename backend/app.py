@@ -766,5 +766,13 @@ try:
 except Exception as e:
     logger.warning(f"Could not load reconciliation blueprint: {e}")
 
+try:
+    from ocr_endpoints import ocr_bp
+    app.register_blueprint(ocr_bp, url_prefix='/api/ocr')
+    logger.info("OCR blueprint registered at /api/ocr")
+except Exception as e:
+    logger.warning(f"OCR blueprint unavailable: {e}")
+
 if __name__ == '__main__':
-    app.run(debug=True, port=5001)
+    port = int(os.getenv('FLASK_PORT', 5001))
+    app.run(debug=True, port=port)
