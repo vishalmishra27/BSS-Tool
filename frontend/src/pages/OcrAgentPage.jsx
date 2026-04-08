@@ -1,556 +1,404 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import {
+  Sparkles, FileText, ListChecks, AlertTriangle, Trash2,
+  Pencil, ArrowUp, X, Plus, History, PanelRightOpen, PanelRightClose, Upload
+} from 'lucide-react';
 
-const SUGGESTIONS = [
-  { label: 'Extract all line items and totals', icon: '≡', desc: 'Pull structured data from invoices' },
-  { label: 'Summarise key details', icon: '📄', desc: 'Get a brief overview of each document' },
-  { label: 'Flag discrepancies', icon: '⚠', desc: 'Find inconsistencies across documents' },
-];
+const STORAGE_KEY = 'bss_ocr_agent_history';
+function loadSessions() { try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch { return []; } }
+function saveSessions(s) { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); }
 
-// ── Markdown table renderer ─────────────────────────────────────────────────
-function MarkdownTable({ raw }) {
-  const lines = raw.trim().split('\n').filter(l => l.includes('|'));
-  if (lines.length < 2) return <span style={{ whiteSpace: 'pre-wrap' }}>{raw}</span>;
+export default function OcrAgentPage() {
+  const [messages, setMessages] = useState([]);
+  const [chatHistory, setChatHistory] = useState([]);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [uploadedFiles, setUploadedFiles] = useState([]);
+  const [uploading, setUploading] = useState(false);
+  const [extractedResults, setExtractedResults] = useState(null);
+  const [extracting, setExtracting] = useState(false);
 
-  const parse = line =>
-    line.split('|').map(c => c.trim()).filter((_, i, a) => i > 0 && i < a.length - 1);
-  const headers = parse(lines[0]);
-  const rows = lines.slice(2).map(parse);
+  const [showConfig, setShowConfig] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState({});
+  const [selectedPages, setSelectedPages] = useState({});
+  const [exportFormat, setExportFormat] = useState('xlsx');
+  const [includeFileCol, setIncludeFileCol] = useState(true);
+  const [includePageCol, setIncludePageCol] = useState(true);
+  const [includeTextCol, setIncludeTextCol] = useState(true);
+  const [includePageBreaks, setIncludePageBreaks] = useState(true);
+  const [textMode, setTextMode] = useState('full');
+  const [showPreview, setShowPreview] = useState(false);
+
+  const bottomRef = useRef(null);
+  const fileRef = useRef(null);
+
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [sessions, setSessions] = useState(loadSessions);
+  const [activeSessionId, setActiveSessionId] = useState(null);
+
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+
+  const saveCurrentSession = useCallback(() => {
+    if (messages.length === 0) return;
+    const title = messages.find(m => m.role === 'user')?.text?.slice(0, 50) || 'New conversation';
+    const updated = loadSessions();
+    if (activeSessionId) {
+      const idx = updated.findIndex(s => s.id === activeSessionId);
+      if (idx >= 0) { updated[idx].messages = messages; updated[idx].title = title; updated[idx].updatedAt = new Date().toISOString(); }
+    } else {
+      const id = Date.now().toString();
+      updated.unshift({ id, title, messages, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+      setActiveSessionId(id);
+    }
+    saveSessions(updated); setSessions(updated);
+  }, [messages, activeSessionId]);
+  useEffect(() => { if (messages.length > 0) saveCurrentSession(); }, [messages.length]);
+
+  const loadSession = (s) => { setMessages(s.messages || []); setActiveSessionId(s.id); setChatHistory([]); };
+  const deleteSession = (id) => { const u = loadSessions().filter(s => s.id !== id); saveSessions(u); setSessions(u); if (activeSessionId === id) { setMessages([]); setChatHistory([]); setActiveSessionId(null); } };
+  const startNewChat = () => { setMessages([]); setChatHistory([]); setActiveSessionId(null); setUploadedFiles([]); setExtractedResults(null); setShowConfig(false); setShowPreview(false); };
+
+  const addMsg = (role, text, extra = {}) => { setMessages(prev => [...prev, { role, text, ts: new Date().toISOString(), ...extra }]); };
+
+  const handleUpload = async (e) => {
+    const files = Array.from(e.target.files); if (!files.length) return;
+    setUploading(true);
+    const uploaded = [];
+    for (const file of files) {
+      const formData = new FormData(); formData.append('file', file);
+      try { const res = await fetch('/api/agent/upload-pdf', { method: 'POST', body: formData }); const data = await res.json(); if (data.file_path) uploaded.push({ name: file.name, path: data.file_path }); }
+      catch { addMsg('agent', `Failed to upload ${file.name}`, { isError: true }); }
+    }
+    if (uploaded.length > 0) { setUploadedFiles(prev => [...prev, ...uploaded]); addMsg('agent', `Uploaded ${uploaded.length} file(s): ${uploaded.map(f => f.name).join(', ')}.\n\nClick "Extract Text" to scan the documents.`); }
+    setUploading(false); e.target.value = '';
+  };
+
+  const handleExtract = async () => {
+    if (!uploadedFiles.length) return;
+    setExtracting(true); addMsg('user', 'Extract text from uploaded documents');
+    try {
+      const res = await fetch('/api/agent/extract-pdf', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ file_paths: uploadedFiles.map(f => f.path) }) });
+      const data = await res.json();
+      if (data.error) addMsg('agent', `Error: ${data.error}`, { isError: true });
+      else {
+        setExtractedResults(data.results);
+        const fSel = {}, pSel = {};
+        data.results.forEach(r => { if (!r.error) { fSel[r.file] = true; r.pages.forEach(pg => { pSel[`${r.file}|${pg.page}`] = true; }); } });
+        setSelectedFiles(fSel); setSelectedPages(pSel); setShowConfig(true);
+        const summary = data.results.map(r => r.error ? `${r.file}: Error` : `${r.file}: ${r.page_count} page(s)`).join('\n');
+        addMsg('agent', `Text extracted!\n\n${summary}\n\nConfigure your export in the right panel.`);
+      }
+    } catch (err) { addMsg('agent', `Network error: ${err.message}`, { isError: true }); }
+    setExtracting(false);
+  };
+
+  const toggleFile = (file) => { const v = !selectedFiles[file]; setSelectedFiles(p => ({ ...p, [file]: v })); setSelectedPages(p => { const u = { ...p }; Object.keys(u).forEach(k => { if (k.startsWith(`${file}|`)) u[k] = v; }); return u; }); };
+  const togglePage = (file, page) => { setSelectedPages(p => ({ ...p, [`${file}|${page}`]: !p[`${file}|${page}`] })); };
+
+  const buildPreviewRows = () => {
+    if (!extractedResults) return [];
+    const rows = [];
+    extractedResults.forEach(r => { if (r.error || !selectedFiles[r.file]) return; r.pages.forEach(pg => { if (!selectedPages[`${r.file}|${pg.page}`]) return; if (textMode === 'lines') { pg.text.split('\n').filter(l => l.trim()).forEach(line => { const row = {}; if (includeFileCol) row['File'] = r.file; if (includePageCol) row['Page'] = pg.page; if (includeTextCol) row['Text'] = line.trim(); rows.push(row); }); } else { const row = {}; if (includeFileCol) row['File'] = r.file; if (includePageCol) row['Page'] = pg.page; if (includeTextCol) row['Text'] = pg.text.trim(); rows.push(row); } }); });
+    return rows;
+  };
+  const buildTxtPreview = () => { if (!extractedResults) return ''; let t = ''; extractedResults.forEach(r => { if (r.error || !selectedFiles[r.file]) return; r.pages.forEach(pg => { if (!selectedPages[`${r.file}|${pg.page}`]) return; if (includePageBreaks) t += `=== ${r.file} — Page ${pg.page} ===\n`; t += pg.text.trim() + '\n\n'; }); }); return t.trim(); };
+
+  const handleDownload = async () => {
+    const sel = []; extractedResults.forEach(r => { if (r.error || !selectedFiles[r.file]) return; const pages = r.pages.filter(pg => selectedPages[`${r.file}|${pg.page}`]).map(pg => pg.page); if (pages.length > 0) { const f = uploadedFiles.find(u => u.name === r.file || u.path.endsWith(r.file)); if (f) sel.push({ file_path: f.path, pages }); } });
+    try {
+      const res = await fetch('/api/agent/extract-pdf/download', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ file_paths: sel.map(s => s.file_path), selected_pages: sel.reduce((a, s) => { a[s.file_path] = s.pages; return a; }, {}), format: exportFormat, include_file_col: includeFileCol, include_page_col: includePageCol, include_text_col: includeTextCol, text_mode: textMode, include_page_breaks: includePageBreaks }) });
+      if (!res.ok) { const err = await res.json(); addMsg('agent', `Download error: ${err.error}`, { isError: true }); return; }
+      const blob = await res.blob(); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `extracted_text.${exportFormat}`; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+      addMsg('agent', `Downloaded extracted_text.${exportFormat} successfully!`);
+    } catch (err) { addMsg('agent', `Download error: ${err.message}`, { isError: true }); }
+  };
+
+  const send = async (text) => {
+    const msg = (text || input).trim(); if (!msg || loading) return;
+    setInput(''); addMsg('user', msg);
+    if (uploadedFiles.length === 0) { addMsg('agent', 'Please upload at least one PDF file first.'); return; }
+    const newHistory = [...chatHistory, { role: 'user', content: msg }]; setChatHistory(newHistory);
+    setLoading(true);
+    try {
+      const res = await fetch('/api/agent/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: `Use the ocr_tool with file_paths ${JSON.stringify(uploadedFiles.map(f => f.path))} to answer: ${msg}`, history: newHistory, current_page: '/agent/ocr' }) });
+      const data = await res.json();
+      if (data.error) addMsg('agent', `Error: ${data.error}`, { isError: true });
+      else if (data.reply) { addMsg('agent', data.reply, { toolUsed: data.tool_used }); setChatHistory(prev => [...prev, { role: 'assistant', content: data.reply }]); }
+    } catch { addMsg('agent', 'Network error.', { isError: true }); }
+    setLoading(false);
+  };
+
+  const CARDS = [
+    { icon: ListChecks, title: 'Extract all line items and totals', desc: 'Pull structured data from invoices' },
+    { icon: FileText, title: 'Summarise key details', desc: 'Get a brief overview of each document' },
+    { icon: AlertTriangle, title: 'Flag discrepancies', desc: 'Find inconsistencies across documents' },
+  ];
+
+  const hasMessages = messages.length > 0;
+  const previewRows = showPreview && exportFormat !== 'txt' ? buildPreviewRows() : [];
+  const previewTxt = showPreview && exportFormat === 'txt' ? buildTxtPreview() : '';
+  const previewCols = previewRows.length > 0 ? Object.keys(previewRows[0]) : [];
+  const selectedPageCount = Object.values(selectedPages).filter(Boolean).length;
+  const selectedFileCount = Object.values(selectedFiles).filter(Boolean).length;
 
   return (
-    <div style={{ overflowX: 'auto', margin: '10px 0' }}>
-      <table style={{ borderCollapse: 'collapse', fontSize: 13, width: '100%', minWidth: 400 }}>
-        <thead>
-          <tr>
-            {headers.map((h, i) => (
-              <th key={i} style={{
-                padding: '8px 14px', background: '#001F5B', color: '#fff',
-                border: '1px solid #001F5B', fontWeight: 600, textAlign: 'left', whiteSpace: 'nowrap',
-              }}>{h}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, ri) => (
-            <tr key={ri} style={{ background: ri % 2 === 0 ? '#fff' : '#f4f7ff' }}>
-              {row.map((cell, ci) => (
-                <td key={ci} style={{ padding: '7px 14px', border: '1px solid #dde6f5', color: '#222', verticalAlign: 'top' }}>
-                  {cell}
-                </td>
+    <div className="flex flex-col h-screen bg-[#f5f7fb] font-sans">
+      <div className="flex-1 flex overflow-hidden">
+        {historyOpen && <HistoryPanel sessions={sessions} activeSessionId={activeSessionId} onLoad={loadSession} onDelete={deleteSession} onNew={startNewChat} onClose={() => setHistoryOpen(false)} />}
+
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+          {/* Top bar */}
+          <div className="flex items-center justify-between px-6 py-3 bg-white border-b border-gray-100">
+            <div className="flex items-center gap-2">
+              <button onClick={() => setHistoryOpen(!historyOpen)} className="p-2 rounded-lg hover:bg-gray-50 text-gray-400 hover:text-gray-600 transition-colors"><History size={18} /></button>
+              {hasMessages && <button onClick={startNewChat} className="p-2 rounded-lg hover:bg-gray-50 text-gray-400 hover:text-gray-600 transition-colors"><Plus size={18} /></button>}
+            </div>
+            <div className="flex items-center gap-2">
+              {extractedResults && (
+                <button onClick={() => setShowConfig(!showConfig)}
+                  className={`p-2 rounded-lg transition-colors ${showConfig ? 'bg-emerald-50 text-emerald-600' : 'text-gray-400 hover:bg-gray-50 hover:text-gray-600'}`}>
+                  {showConfig ? <PanelRightClose size={18} /> : <PanelRightOpen size={18} />}
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* File bar when files uploaded */}
+          {uploadedFiles.length > 0 && (
+            <div className="px-6 py-2.5 bg-white border-b border-gray-50 flex items-center gap-2 flex-wrap">
+              <input ref={fileRef} type="file" accept=".pdf" multiple onChange={handleUpload} className="hidden" />
+              {uploadedFiles.map((f, i) => (
+                <span key={i} className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 rounded-lg text-[11px] font-medium text-emerald-700 border border-emerald-100">
+                  <FileText size={12} /> {f.name}
+                  <button onClick={() => { setUploadedFiles(p => p.filter((_, j) => j !== i)); if (uploadedFiles.length <= 1) { setExtractedResults(null); setShowConfig(false); } }} className="text-emerald-300 hover:text-red-400"><X size={12} /></button>
+                </span>
               ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+              <button onClick={() => fileRef.current?.click()} className="px-2.5 py-1 rounded-lg text-[11px] text-gray-400 hover:bg-gray-50 border border-gray-200">+ Add</button>
+              {!extractedResults && (
+                <button onClick={handleExtract} disabled={extracting}
+                  className="px-3 py-1 rounded-lg text-[11px] font-semibold bg-emerald-500 text-white hover:bg-emerald-600 shadow-sm shadow-emerald-500/20">
+                  {extracting ? 'Extracting...' : 'Extract Text'}
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Preview */}
+          {showPreview && extractedResults && (
+            <div className="mx-6 mt-3 bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-bold text-gray-700">Preview — {exportFormat.toUpperCase()} ({selectedFileCount} file(s), {selectedPageCount} page(s))</span>
+                <div className="flex gap-2">
+                  <button onClick={handleDownload} className="px-3 py-1 rounded-lg text-[11px] font-bold bg-emerald-500 text-white hover:bg-emerald-600">Download</button>
+                  <button onClick={() => setShowPreview(false)} className="px-3 py-1 rounded-lg text-[11px] text-gray-400 hover:bg-gray-50 border border-gray-200">Close</button>
+                </div>
+              </div>
+              {exportFormat === 'txt' ? (
+                <pre className="bg-gray-50 rounded-lg p-3 text-[11px] whitespace-pre-wrap max-h-64 overflow-y-auto text-gray-600 leading-relaxed">{previewTxt || 'No content selected.'}</pre>
+              ) : (
+                <div className="overflow-x-auto max-h-64 overflow-y-auto rounded-lg border border-gray-50">
+                  <table className="w-full text-[11px]">
+                    <thead><tr className="bg-gray-50 sticky top-0">{previewCols.map(c => <th key={c} className="px-3 py-1.5 text-left font-bold text-gray-600">{c}</th>)}</tr></thead>
+                    <tbody>{previewRows.slice(0, 50).map((row, i) => <tr key={i} className="border-t border-gray-50">{previewCols.map(c => <td key={c} className="px-3 py-1 text-gray-500 max-w-[300px] truncate">{row[c] ?? ''}</td>)}</tr>)}</tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Welcome / Chat */}
+          {!hasMessages && uploadedFiles.length === 0 ? (
+            <div className="flex-1 flex flex-col items-center justify-center px-6 py-12">
+              <div className="w-14 h-14 rounded-2xl bg-emerald-500 flex items-center justify-center mb-6 shadow-lg shadow-emerald-500/20">
+                <Sparkles size={28} className="text-white" />
+              </div>
+              <h1 className="text-2xl font-bold text-gray-900 mb-2 text-center">What documents shall I analyse?</h1>
+              <p className="text-sm text-gray-500 text-center max-w-lg mb-10">
+                Upload PDF files to extract text, configure your export, preview the output, and download as TXT, CSV, or XLSX.
+              </p>
+
+              {/* Upload zone */}
+              <input ref={fileRef} type="file" accept=".pdf" multiple onChange={handleUpload} className="hidden" />
+              <button onClick={() => fileRef.current?.click()} disabled={uploading}
+                className="max-w-md w-full bg-white rounded-2xl border-2 border-dashed border-gray-200 hover:border-emerald-300 hover:bg-emerald-50/30 p-10 text-center transition-all cursor-pointer mb-10 group">
+                <Upload size={32} className="mx-auto mb-3 text-gray-300 group-hover:text-emerald-400 transition-colors" />
+                <div className="text-sm font-semibold text-gray-600 group-hover:text-emerald-700">{uploading ? 'Uploading...' : 'Click to select PDF files'}</div>
+                <div className="text-xs text-gray-300 mt-1">or drag and drop here</div>
+              </button>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-2xl w-full mb-10">
+                {CARDS.map((card, i) => {
+                  const Icon = card.icon;
+                  return (
+                    <button key={i} onClick={() => send(card.title)}
+                      className="bg-white rounded-xl p-5 text-left shadow-sm hover:shadow-md transition-shadow border border-gray-50 group cursor-pointer">
+                      <Icon size={20} className="text-gray-400 group-hover:text-emerald-500 transition-colors mb-3" />
+                      <div className="text-sm font-semibold text-gray-800 mb-1">{card.title}</div>
+                      <div className="text-xs text-gray-500 leading-relaxed">{card.desc}</div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="w-full max-w-2xl">
+                <ChatInput input={input} setInput={setInput} loading={loading} onSend={send}
+                  placeholder="Upload PDFs first, then ask questions…" accent="emerald" />
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+                {messages.map((m, i) => (
+                  <div key={i} className={`flex items-start gap-3 ${m.role === 'user' ? 'justify-end' : ''}`}>
+                    {m.role === 'agent' && <div className="w-7 h-7 rounded-lg bg-emerald-500 flex items-center justify-center flex-shrink-0 shadow-sm shadow-emerald-500/20"><Sparkles size={14} className="text-white" /></div>}
+                    <div className={`max-w-[72%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
+                      m.role === 'user' ? 'bg-gray-900 text-white rounded-br-md' : m.isError ? 'bg-red-50 text-red-600 border border-red-100 rounded-bl-md' : 'bg-white text-gray-700 border border-gray-100 shadow-sm rounded-bl-md'
+                    }`}>
+                      {m.text}
+                      {m.toolUsed && <div className="mt-1.5 pt-1.5 border-t border-gray-50 text-[10px] text-gray-300">Tool: {m.toolUsed}</div>}
+                    </div>
+                  </div>
+                ))}
+                {(loading || extracting) && (
+                  <div className="flex items-center gap-3">
+                    <div className="w-7 h-7 rounded-lg bg-emerald-500 flex items-center justify-center flex-shrink-0 shadow-sm"><Sparkles size={14} className="text-white" /></div>
+                    <div className="bg-white border border-gray-100 rounded-2xl rounded-bl-md px-4 py-3 shadow-sm flex gap-1.5">
+                      {[0,1,2].map(i => <div key={i} className="w-1.5 h-1.5 rounded-full bg-gray-300 animate-pulse" style={{ animationDelay: `${i*200}ms` }} />)}
+                    </div>
+                  </div>
+                )}
+                <div ref={bottomRef} />
+              </div>
+              {uploadedFiles.length > 0 && messages.length <= 4 && (
+                <div className="px-6 pb-2 flex flex-wrap gap-2">
+                  {CARDS.map((s, i) => (
+                    <button key={i} onClick={() => send(s.title)} className="px-3 py-1.5 rounded-full bg-white border border-gray-100 text-xs text-gray-500 hover:border-emerald-300 hover:bg-emerald-50 transition-colors">
+                      {s.title}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div className="px-6 pb-4 pt-2 bg-[#f5f7fb]">
+                <div className="max-w-3xl mx-auto">
+                  <ChatInput input={input} setInput={setInput} loading={loading} onSend={send}
+                    placeholder="Ask about the uploaded documents…" accent="emerald" />
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Export config panel */}
+        {showConfig && extractedResults && (
+          <div className="w-72 flex-shrink-0 bg-white border-l border-gray-100 flex flex-col overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-100">
+              <div className="text-xs font-semibold text-gray-700 uppercase tracking-wider">Export Config</div>
+              <div className="text-[10px] text-gray-300 mt-0.5">{selectedFileCount} file(s), {selectedPageCount} page(s)</div>
+            </div>
+
+            <div className="px-4 py-3 border-b border-gray-50">
+              <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Format</div>
+              <div className="flex gap-2">
+                {['txt','csv','xlsx'].map(f => (
+                  <button key={f} onClick={() => setExportFormat(f)}
+                    className={`flex-1 py-1.5 rounded-lg text-[11px] font-bold uppercase transition-colors ${exportFormat === f ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' : 'bg-gray-50 text-gray-400 border border-gray-100'}`}>{f}</button>
+                ))}
+              </div>
+            </div>
+
+            <div className="px-4 py-3 border-b border-gray-50 flex-1 overflow-y-auto">
+              <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Files & Pages</div>
+              {extractedResults.filter(r => !r.error).map((r, fi) => (
+                <div key={fi} className="mb-2">
+                  <label className="flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-gray-700">
+                    <input type="checkbox" checked={!!selectedFiles[r.file]} onChange={() => toggleFile(r.file)} className="accent-emerald-500 rounded" /> {r.file}
+                  </label>
+                  {selectedFiles[r.file] && <div className="pl-5 mt-1 space-y-0.5">
+                    {r.pages.map(pg => (
+                      <label key={pg.page} className="flex items-center gap-1.5 cursor-pointer text-[11px] text-gray-500">
+                        <input type="checkbox" checked={!!selectedPages[`${r.file}|${pg.page}`]} onChange={() => togglePage(r.file, pg.page)} className="accent-emerald-500 rounded" />
+                        Page {pg.page} <span className="text-gray-300 text-[10px]">({pg.text.length})</span>
+                      </label>
+                    ))}
+                  </div>}
+                </div>
+              ))}
+            </div>
+
+            {exportFormat !== 'txt' ? (
+              <div className="px-4 py-3 border-b border-gray-50">
+                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Columns</div>
+                {[['File Name',includeFileCol,()=>setIncludeFileCol(v=>!v)],['Page Number',includePageCol,()=>setIncludePageCol(v=>!v)],['Extracted Text',includeTextCol,()=>setIncludeTextCol(v=>!v)]].map(([l,v,t])=>(
+                  <label key={l} className="flex items-center gap-1.5 cursor-pointer text-xs text-gray-600 mb-1"><input type="checkbox" checked={v} onChange={t} className="accent-emerald-500 rounded" />{l}</label>
+                ))}
+                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mt-3 mb-2">Structure</div>
+                {[['Full page (1 row/page)','full'],['Split lines (1 row/line)','lines']].map(([l,v])=>(
+                  <label key={v} className="flex items-center gap-1.5 cursor-pointer text-xs text-gray-600 mb-1"><input type="radio" name="tm" checked={textMode===v} onChange={()=>setTextMode(v)} className="accent-emerald-500" />{l}</label>
+                ))}
+              </div>
+            ) : (
+              <div className="px-4 py-3 border-b border-gray-50">
+                <label className="flex items-center gap-1.5 cursor-pointer text-xs text-gray-600">
+                  <input type="checkbox" checked={includePageBreaks} onChange={()=>setIncludePageBreaks(v=>!v)} className="accent-emerald-500 rounded" /> Include page separators
+                </label>
+              </div>
+            )}
+
+            <div className="px-4 py-3 space-y-2">
+              <button onClick={() => setShowPreview(true)} className="w-full py-2 rounded-lg border-2 border-emerald-500 text-emerald-600 text-xs font-bold hover:bg-emerald-50 transition-colors">Preview</button>
+              <button onClick={handleDownload} className="w-full py-2 rounded-lg bg-emerald-500 text-white text-xs font-bold hover:bg-emerald-600 shadow-sm shadow-emerald-500/20 transition-colors">Download {exportFormat.toUpperCase()}</button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
-function renderInline(text) {
-  const segments = [];
-  const rx = /(\*\*(.+?)\*\*|\*(.+?)\*)/g;
-  let last = 0, m;
-  while ((m = rx.exec(text)) !== null) {
-    if (m.index > last) segments.push(text.slice(last, m.index));
-    if (m[2]) segments.push(<strong key={m.index}>{m[2]}</strong>);
-    else if (m[3]) segments.push(<em key={m.index}>{m[3]}</em>);
-    last = m.index + m[0].length;
-  }
-  if (last < text.length) segments.push(text.slice(last));
-  return segments;
-}
-
-function MessageBody({ text }) {
-  if (!text) return null;
-  const parts = [];
-  const tableRx = /(\|.+\|[ \t]*\n\|[-| :]+\|\n(?:\|.+\|[ \t]*\n?)*)/g;
-  let last = 0, m;
-  while ((m = tableRx.exec(text)) !== null) {
-    if (m.index > last) parts.push({ type: 'text', content: text.slice(last, m.index) });
-    parts.push({ type: 'table', content: m[0] });
-    last = m.index + m[0].length;
-  }
-  if (last < text.length) parts.push({ type: 'text', content: text.slice(last) });
-
+function ChatInput({ input, setInput, loading, onSend, placeholder, accent = 'blue' }) {
+  const colors = { blue: 'bg-blue-500 hover:bg-blue-600 shadow-blue-500/20', violet: 'bg-violet-500 hover:bg-violet-600 shadow-violet-500/20', cyan: 'bg-cyan-500 hover:bg-cyan-600 shadow-cyan-500/20', emerald: 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/20' };
   return (
-    <>
-      {parts.map((p, i) =>
-        p.type === 'table'
-          ? <MarkdownTable key={i} raw={p.content} />
-          : <span key={i} style={{ whiteSpace: 'pre-wrap' }}>{renderInline(p.content)}</span>
-      )}
-    </>
+    <div className="flex items-center gap-3 bg-white rounded-full px-4 py-3 shadow-sm border border-gray-100">
+      <Pencil size={16} className="text-gray-400 flex-shrink-0" />
+      <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && onSend()} placeholder={placeholder} disabled={loading}
+        className="flex-1 bg-transparent outline-none text-sm text-gray-700 placeholder-gray-400 disabled:opacity-70" />
+      <button onClick={() => onSend()} disabled={loading || !input.trim()}
+        className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-all ${input.trim() ? `${colors[accent]} text-white shadow-sm` : 'bg-gray-100 text-gray-300 cursor-not-allowed'}`}>
+        <ArrowUp size={16} />
+      </button>
+    </div>
   );
 }
 
-// ── Export helpers ─────────────────────────────────────────────────────────
-async function exportExcel(answer, filename) {
-  const res = await fetch('/api/ocr/export-excel', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ answer, filename }),
-  });
-  if (!res.ok) throw new Error('Export failed');
-  const blob = await res.blob();
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename || 'ocr_output.xlsx';
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-function exportTxt(answer, filename) {
-  const blob = new Blob([answer], { type: 'text/plain' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename || 'ocr_output.txt';
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-// ── Main component ─────────────────────────────────────────────────────────
-export default function OcrAgentPage() {
-  const [uploadedFiles, setUploadedFiles] = useState([]);
-  const [uploading, setUploading] = useState(false);
-  const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [dragOver, setDragOver] = useState(false);
-  const [batchItems, setBatchItems] = useState('');
-  const [showBatch, setShowBatch] = useState(false);
-  const fileRef = useRef(null);
-  const bottomRef = useRef(null);
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, loading]);
-
-  const addMsg = (role, text, extra = {}) =>
-    setMessages(prev => [...prev, { role, text, ts: new Date(), ...extra }]);
-
-  // ── Upload ────────────────────────────────────────────────────────────────
-  const uploadFiles = async (files) => {
-    if (!files.length) return;
-    setUploading(true);
-    const formData = new FormData();
-    for (const f of files) formData.append('files', f);
-
-    try {
-      const res = await fetch('/api/ocr/upload', { method: 'POST', body: formData });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Upload failed');
-
-      const added = data.files || [];
-      setUploadedFiles(prev => {
-        const existing = new Set(prev.map(f => f.path));
-        return [...prev, ...added.filter(f => !existing.has(f.path))];
-      });
-
-      const readable = added.filter(f => f.readable);
-      const scanned = added.filter(f => !f.readable);
-
-      if (readable.length) {
-        const details = readable.map(f =>
-          `• ${f.name} — ${(f.chars / 1000).toFixed(1)}k chars, ${f.chunks} chunks`
-        ).join('\n');
-        addMsg('agent',
-          `Loaded ${readable.length} readable PDF${readable.length > 1 ? 's' : ''}:\n${details}\n\nReady — ask me anything about them.`,
-          { isSuccess: true }
-        );
-      }
-      if (scanned.length) {
-        addMsg('agent',
-          `⚠️ ${scanned.map(f => f.name).join(', ')} appear to be scanned/image-based PDFs (no text layer detected). Document Intelligence support for scanned PDFs is coming soon.`,
-          { isWarning: true }
-        );
-      }
-    } catch (err) {
-      addMsg('agent', `Upload failed: ${err.message}`, { isError: true });
-    }
-    setUploading(false);
-  };
-
-  const handleFileInput = (e) => { uploadFiles(Array.from(e.target.files)); e.target.value = ''; };
-  const handleDrop = (e) => {
-    e.preventDefault(); setDragOver(false);
-    const files = Array.from(e.dataTransfer.files).filter(f => f.type === 'application/pdf');
-    if (files.length) uploadFiles(files);
-  };
-
-  // ── Send question ──────────────────────────────────────────────────────────
-  const send = async (text) => {
-    const msg = (text || input).trim();
-    if (!msg || loading) return;
-    setInput('');
-    addMsg('user', msg);
-
-    const readableFiles = uploadedFiles.filter(f => f.readable !== false);
-    if (!readableFiles.length) {
-      addMsg('agent', 'Please upload at least one readable (text-layer) PDF first.');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const res = await fetch('/api/ocr/analyse', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          question: msg,
-          file_paths: readableFiles.map(f => ({ name: f.name, path: f.path })),
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        addMsg('agent', data.error || 'Analysis failed.', { isError: true });
-      } else {
-        addMsg('agent', data.answer, {
-          docs: data.docs_processed,
-          unreadable: data.unreadable_docs,
-          exportable: true,
-          answer: data.answer,
-        });
-      }
-    } catch {
-      addMsg('agent', 'Network error — could not reach the server.', { isError: true });
-    }
-    setLoading(false);
-  };
-
-  // ── Batch extract ──────────────────────────────────────────────────────────
-  const runBatch = async () => {
-    const items = batchItems.split('\n').map(s => s.trim()).filter(Boolean);
-    if (!items.length) return;
-    addMsg('user', `Extract these fields:\n${items.map(i => `• ${i}`).join('\n')}`);
-    setShowBatch(false);
-    setBatchItems('');
-
-    const readableFiles = uploadedFiles.filter(f => f.readable !== false);
-    if (!readableFiles.length) {
-      addMsg('agent', 'No readable PDFs loaded.', { isError: true });
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const res = await fetch('/api/ocr/batch-extract', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          items,
-          file_paths: readableFiles.map(f => ({ name: f.name, path: f.path })),
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        addMsg('agent', data.error || 'Batch extract failed.', { isError: true });
-      } else {
-        // Build a markdown table from the result
-        const cols = data.columns || [];
-        const rows = data.table || [];
-        let md = cols.join(' | ') + '\n' + cols.map(() => '---').join(' | ') + '\n';
-        for (const row of rows) md += cols.map(c => row[c] ?? '').join(' | ') + '\n';
-        addMsg('agent', md, {
-          docs: data.docs_processed,
-          exportable: true,
-          answer: md,
-          excelB64: data.excel_b64,
-          batchFilename: `batch_extract_${Date.now()}.xlsx`,
-        });
-      }
-    } catch {
-      addMsg('agent', 'Network error.', { isError: true });
-    }
-    setLoading(false);
-  };
-
-  // ── Reset ─────────────────────────────────────────────────────────────────
-  const reset = async () => {
-    await fetch('/api/ocr/reset', { method: 'DELETE' });
-    setUploadedFiles([]);
-    setMessages([]);
-  };
-
-  const removeFile = path => setUploadedFiles(prev => prev.filter(f => f.path !== path));
-  const hasReadable = uploadedFiles.some(f => f.readable !== false);
-  const showEmpty = messages.length === 0;
-
-  // ── Render ────────────────────────────────────────────────────────────────
+function HistoryPanel({ sessions, activeSessionId, onLoad, onDelete, onNew, onClose }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#f8faff', fontFamily: 'system-ui, sans-serif' }}>
-
-      {/* Header */}
-      <div style={{ padding: '14px 24px', borderBottom: '1px solid #e8eef8', background: '#fff', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ width: 32, height: 32, background: 'linear-gradient(135deg,#00C4A7,#001F5B)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 16 }}>✦</div>
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 15, color: '#001F5B' }}>Document Analysis Agent</div>
-            <div style={{ fontSize: 12, color: '#888' }}>Upload readable PDFs — extract text, flag discrepancies, export to Excel</div>
-          </div>
+    <div className="w-64 flex-shrink-0 bg-white border-r border-gray-100 flex flex-col overflow-hidden">
+      <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+        <div className="text-xs font-semibold text-gray-700 uppercase tracking-wider">History</div>
+        <div className="flex items-center gap-1">
+          <button onClick={onNew} className="p-1.5 rounded-lg hover:bg-gray-50 text-gray-400 hover:text-gray-600"><Plus size={14} /></button>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-50 text-gray-400 hover:text-gray-600"><X size={14} /></button>
         </div>
-        {uploadedFiles.length > 0 && (
-          <button onClick={reset} title="Clear all documents and start fresh" style={{ padding: '6px 14px', borderRadius: 6, border: '1px solid #dde', background: '#fff', color: '#666', fontSize: 12, cursor: 'pointer' }}>
-            Reset session
-          </button>
-        )}
       </div>
-
-      {/* Scroll area */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '24px 24px 0' }}>
-
-        {/* ── Empty state ── */}
-        {showEmpty && (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 32, gap: 24 }}>
-            <div style={{ width: 60, height: 60, background: 'linear-gradient(135deg,#00C4A7,#001F5B)', borderRadius: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, color: '#fff' }}>✦</div>
-            <div style={{ textAlign: 'center' }}>
-              <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: '#111' }}>What documents shall I analyse?</h2>
-              <p style={{ margin: '8px 0 0', color: '#666', fontSize: 14 }}>
-                Upload PDF files to extract text, preview the output,<br />and download as TXT or XLSX.
-              </p>
-            </div>
-
-            {/* Drop zone */}
-            <div
-              onDragOver={e => { e.preventDefault(); setDragOver(true); }}
-              onDragLeave={() => setDragOver(false)}
-              onDrop={handleDrop}
-              onClick={() => !uploading && fileRef.current?.click()}
-              style={{
-                width: '100%', maxWidth: 540,
-                border: `2px dashed ${dragOver ? '#001F5B' : '#c8d4f0'}`,
-                borderRadius: 14, padding: '40px 20px', textAlign: 'center', cursor: 'pointer',
-                background: dragOver ? '#eef2ff' : '#fff', transition: 'all 0.15s',
-              }}
-            >
-              <div style={{ fontSize: 32, color: '#aab', marginBottom: 10 }}>⬆</div>
-              <div style={{ fontWeight: 600, fontSize: 14, color: '#333' }}>
-                {uploading ? 'Uploading…' : 'Click to select PDF files'}
-              </div>
-              <div style={{ fontSize: 12, color: '#999', marginTop: 4 }}>or drag and drop here</div>
-            </div>
-
-            {/* Feature cards */}
-            <div style={{ display: 'flex', gap: 14, width: '100%', maxWidth: 700, flexWrap: 'wrap' }}>
-              {SUGGESTIONS.map((s, i) => (
-                <div key={i} onClick={() => hasReadable && send(s.label)}
-                  style={{
-                    flex: '1 1 180px', background: '#fff', border: '1px solid #e0e8f0',
-                    borderRadius: 10, padding: 16, cursor: hasReadable ? 'pointer' : 'default',
-                    opacity: hasReadable ? 1 : 0.65, transition: 'box-shadow 0.15s',
-                  }}
-                  onMouseEnter={e => hasReadable && (e.currentTarget.style.boxShadow = '0 3px 14px rgba(0,31,91,0.12)')}
-                  onMouseLeave={e => (e.currentTarget.style.boxShadow = 'none')}
-                >
-                  <div style={{ fontSize: 22, marginBottom: 8 }}>{s.icon}</div>
-                  <div style={{ fontWeight: 600, fontSize: 13, color: '#111', marginBottom: 4 }}>{s.label}</div>
-                  <div style={{ fontSize: 12, color: '#666' }}>{s.desc}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* ── Conversation ── */}
-        {!showEmpty && (
-          <div style={{ maxWidth: 820, margin: '0 auto' }}>
-
-            {/* Uploaded file pills */}
-            {uploadedFiles.length > 0 && (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
-                {uploadedFiles.map((f, i) => (
-                  <span key={i} style={{
-                    display: 'flex', alignItems: 'center', gap: 6, padding: '4px 12px',
-                    background: f.readable === false ? '#fff5f5' : '#f0f4ff',
-                    borderRadius: 20, fontSize: 12,
-                    color: f.readable === false ? '#c00' : '#001F5B',
-                    border: `1px solid ${f.readable === false ? '#ffd0d0' : '#c8d4f0'}`,
-                  }}>
-                    {f.readable === false ? '⚠️' : '📄'} {f.name}
-                    {f.chunks ? <span style={{ opacity: 0.5 }}>({f.chunks} chunks)</span> : null}
-                    <span onClick={() => removeFile(f.path)} style={{ cursor: 'pointer', opacity: 0.45, fontSize: 15, lineHeight: 1 }}>×</span>
-                  </span>
-                ))}
-                <button onClick={() => fileRef.current?.click()} style={{
-                  padding: '4px 12px', borderRadius: 20, border: '1px dashed #c8d4f0',
-                  background: 'transparent', color: '#555', fontSize: 12, cursor: 'pointer',
-                }}>+ Add PDFs</button>
-              </div>
-            )}
-
-            {/* Messages */}
-            {messages.map((m, i) => (
-              <div key={i} style={{ marginBottom: 18 }}>
-                {m.role === 'user' ? (
-                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                    <div style={{
-                      maxWidth: '72%', padding: '10px 16px',
-                      borderRadius: '14px 14px 3px 14px',
-                      background: '#001F5B', color: '#fff', fontSize: 14, lineHeight: 1.6,
-                      whiteSpace: 'pre-wrap',
-                    }}>{m.text}</div>
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                    <div style={{
-                      width: 30, height: 30, borderRadius: 8, flexShrink: 0,
-                      background: 'linear-gradient(135deg,#00C4A7,#001F5B)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      color: '#fff', fontSize: 14, marginTop: 2,
-                    }}>✦</div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{
-                        padding: '12px 16px',
-                        borderRadius: '3px 14px 14px 14px',
-                        background: m.isError ? '#fff5f5' : m.isWarning ? '#fffbf0' : '#fff',
-                        border: `1px solid ${m.isError ? '#ffd0d0' : m.isWarning ? '#ffe4a0' : '#e4eaf6'}`,
-                        color: m.isError ? '#b00' : '#222',
-                        fontSize: 14, lineHeight: 1.75,
-                      }}>
-                        <MessageBody text={m.text} />
-
-                        {/* Source docs footer */}
-                        {m.docs?.length > 0 && (
-                          <div style={{ marginTop: 10, fontSize: 11, color: '#888', borderTop: '1px solid #eef', paddingTop: 6 }}>
-                            Analysed: {m.docs.join(' · ')}
-                          </div>
-                        )}
-                        {m.unreadable?.length > 0 && (
-                          <div style={{ marginTop: 4, fontSize: 11, color: '#b08000' }}>
-                            ⚠️ Skipped (scanned): {m.unreadable.map(u => u.name).join(', ')}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Export buttons */}
-                      {m.exportable && (
-                        <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                          <ExportButton
-                            label="Export to Excel"
-                            icon="📊"
-                            onClick={async () => {
-                              if (m.excelB64) {
-                                // Batch extract — use pre-built Excel
-                                const bytes = Uint8Array.from(atob(m.excelB64), c => c.charCodeAt(0));
-                                const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-                                const url = URL.createObjectURL(blob);
-                                const a = document.createElement('a');
-                                a.href = url; a.download = m.batchFilename || 'batch_extract.xlsx'; a.click();
-                                URL.revokeObjectURL(url);
-                              } else {
-                                await exportExcel(m.answer, `ocr_output_${i}.xlsx`);
-                              }
-                            }}
-                          />
-                          <ExportButton
-                            label="Export to TXT"
-                            icon="📄"
-                            onClick={() => exportTxt(m.answer, `ocr_output_${i}.txt`)}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
-
-            {loading && (
-              <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 18 }}>
-                <div style={{ width: 30, height: 30, borderRadius: 8, background: 'linear-gradient(135deg,#00C4A7,#001F5B)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 14, flexShrink: 0, marginTop: 2 }}>✦</div>
-                <div style={{ padding: '12px 16px', background: '#fff', border: '1px solid #e4eaf6', borderRadius: '3px 14px 14px 14px', fontSize: 14, color: '#888', display: 'flex', gap: 5, alignItems: 'center' }}>
-                  <Dot delay={0} /><Dot delay={0.2} /><Dot delay={0.4} />
-                  &nbsp; Analysing documents…
+      {sessions.length === 0 ? <div className="p-6 text-center text-xs text-gray-300">No conversations yet</div> : (
+        <div className="flex-1 overflow-y-auto">
+          {sessions.map(s => {
+            const isActive = s.id === activeSessionId;
+            const count = s.messages?.length || 0;
+            const date = s.updatedAt ? new Date(s.updatedAt) : null;
+            return (
+              <div key={s.id} onClick={() => onLoad(s)}
+                className={`px-4 py-3 cursor-pointer border-b border-gray-50 transition-colors ${isActive ? 'bg-emerald-50 border-l-2 border-l-emerald-500' : 'hover:bg-gray-50 border-l-2 border-l-transparent'}`}>
+                <div className="text-xs font-medium text-gray-700 truncate mb-1">{s.title || 'Untitled'}</div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-gray-300">{count} msg{count !== 1 ? 's' : ''}{date ? ` · ${date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}` : ''}</span>
+                  <button onClick={e => { e.stopPropagation(); onDelete(s.id); }} className="text-gray-200 hover:text-red-400 transition-colors"><Trash2 size={12} /></button>
                 </div>
               </div>
-            )}
-            <div ref={bottomRef} />
-          </div>
-        )}
-      </div>
-
-      {/* ── Batch extract panel ── */}
-      {showBatch && (
-        <div style={{ flexShrink: 0, borderTop: '1px solid #e8eef8', background: '#f4f7ff', padding: '14px 24px' }}>
-          <div style={{ maxWidth: 820, margin: '0 auto' }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#001F5B', marginBottom: 6 }}>
-              Batch Extract — enter one field per line (e.g. "Invoice Number", "Total Amount", "Supplier Name")
-            </div>
-            <textarea
-              value={batchItems}
-              onChange={e => setBatchItems(e.target.value)}
-              placeholder={'Invoice Number\nTotal Amount\nDue Date\nSupplier Name'}
-              rows={4}
-              style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #c8d4f0', fontSize: 13, resize: 'vertical', boxSizing: 'border-box' }}
-            />
-            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-              <button onClick={runBatch} disabled={!batchItems.trim() || loading} style={{ padding: '8px 20px', background: '#001F5B', color: '#fff', border: 'none', borderRadius: 7, fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
-                Extract &amp; Build Table
-              </button>
-              <button onClick={() => setShowBatch(false)} style={{ padding: '8px 14px', background: '#fff', color: '#555', border: '1px solid #dde', borderRadius: 7, fontSize: 13, cursor: 'pointer' }}>
-                Cancel
-              </button>
-            </div>
-          </div>
+            );
+          })}
         </div>
       )}
-
-      {/* ── Bottom bar ── */}
-      <div style={{ flexShrink: 0, borderTop: '1px solid #e8eef8', background: '#fff', padding: '12px 24px 16px' }}>
-
-        {/* Suggestion chips */}
-        {hasReadable && messages.length <= 2 && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
-            {SUGGESTIONS.map((s, i) => (
-              <button key={i} onClick={() => send(s.label)} style={{
-                background: '#f0f4ff', border: '1px solid #c8d4f0', borderRadius: 20,
-                padding: '6px 14px', fontSize: 12, color: '#001F5B', cursor: 'pointer',
-              }}>{s.label}</button>
-            ))}
-            <button onClick={() => setShowBatch(b => !b)} style={{
-              background: '#fff8f0', border: '1px solid #f0d4b0', borderRadius: 20,
-              padding: '6px 14px', fontSize: 12, color: '#885500', cursor: 'pointer',
-            }}>📊 Batch Extract to Table</button>
-          </div>
-        )}
-
-        <div style={{ maxWidth: 820, margin: '0 auto', display: 'flex', gap: 10, alignItems: 'center' }}>
-          {/* Upload button */}
-          <button onClick={() => fileRef.current?.click()} disabled={uploading} title="Upload PDF files"
-            style={{ width: 40, height: 40, borderRadius: 8, border: '1px solid #e0e8f0', background: '#f8faff', color: '#555', fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            ⬆
-          </button>
-
-          {/* Batch extract button */}
-          <button onClick={() => setShowBatch(b => !b)} title="Batch extract specific fields"
-            style={{ width: 40, height: 40, borderRadius: 8, border: '1px solid #e0e8f0', background: showBatch ? '#f0f4ff' : '#f8faff', color: '#555', fontSize: 16, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            📊
-          </button>
-
-          <input
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && !e.shiftKey && send()}
-            placeholder={hasReadable ? 'Ask about the uploaded documents…' : 'Upload PDFs first, then ask questions…'}
-            disabled={loading}
-            style={{ flex: 1, padding: '10px 14px', borderRadius: 8, border: '1px solid #d0d8f0', fontSize: 14, outline: 'none' }}
-          />
-
-          <button onClick={() => send()} disabled={loading || !input.trim()}
-            style={{
-              width: 40, height: 40, borderRadius: 8, border: 'none',
-              background: input.trim() && !loading ? '#001F5B' : '#ddd',
-              color: '#fff', fontSize: 18, cursor: input.trim() && !loading ? 'pointer' : 'not-allowed',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'background 0.15s',
-            }}>➤</button>
-        </div>
-      </div>
-
-      <input ref={fileRef} type="file" accept=".pdf" multiple onChange={handleFileInput} style={{ display: 'none' }} />
-
-      <style>{`
-        @keyframes pulse { 0%,100%{opacity:.25} 50%{opacity:1} }
-      `}</style>
     </div>
   );
 }

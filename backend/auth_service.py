@@ -118,7 +118,7 @@ def check_password(plain: str, hashed: str) -> bool:
 
 def create_token(user: dict) -> str:
     payload = {
-        'sub': user['id'],
+        'sub': str(user['id']),
         'username': user['username'],
         'full_name': user['full_name'],
         'role': user['role'],

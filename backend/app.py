@@ -541,11 +541,53 @@ def uat_lob_distribution():
                 SUM(CASE WHEN status='CLOSED' THEN 1 ELSE 0 END) as closed,
                 SUM(CASE WHEN status='REOPENED' THEN 1 ELSE 0 END) as reopened,
                 SUM(CASE WHEN status='CANCELLED' THEN 1 ELSE 0 END) as cancelled,
+                SUM(CASE WHEN status='READY_FOR_TESTING' THEN 1 ELSE 0 END) as ready_for_testing,
                 SUM(CASE WHEN status='NEEDS_FIX' THEN 1 ELSE 0 END) as needs_fix,
                 SUM(CASE WHEN status='DEFECT' THEN 1 ELSE 0 END) as defect
             FROM uat_cases GROUP BY lob ORDER BY lob
         """)
         return jsonify(list(rows))
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/uat/priority-distribution')
+def uat_priority_distribution():
+    try:
+        rows = query("""
+            SELECT priority,
+                COUNT(*) as count
+            FROM uat_cases GROUP BY priority ORDER BY priority
+        """)
+        return jsonify(list(rows))
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/legacy-products/raw')
+def legacy_products_raw():
+    try:
+        rows = query("""
+            SELECT product_id, product_name, lob,
+                   CASE WHEN migration_flag='migrate' THEN 'Migrate' ELSE 'Purge' END as rationalization_status,
+                   CASE WHEN status='configured' THEN NULL ELSE 'Pending Configuration' END as pending_on
+            FROM products ORDER BY lob, product_id
+        """)
+        return jsonify({'data': list(rows)})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/legacy-products/export')
+def legacy_products_export():
+    try:
+        rows = query("SELECT product_id, product_name, lob, migration_flag, status FROM products ORDER BY lob, product_id")
+        import csv, io
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(['product_id', 'product_name', 'lob', 'migration_flag', 'status'])
+        for r in rows:
+            writer.writerow([r['product_id'], r['product_name'], r['lob'], r['migration_flag'], r['status']])
+        resp = app.response_class(output.getvalue(), mimetype='text/csv')
+        resp.headers['Content-Disposition'] = 'attachment; filename=legacy_products.csv'
+        return resp
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

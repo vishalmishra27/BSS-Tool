@@ -149,7 +149,7 @@ def upload_file():
     delimiter = '|' if f.filename.lower().endswith('.psv') else ','
 
     try:
-        df_sample = pd.read_csv(file_path, sep=delimiter, nrows=5, dtype=str)
+        df_sample = pd.read_csv(file_path, sep=delimiter, nrows=5, dtype=str).fillna('')
         headers = list(df_sample.columns)
         sample_rows = df_sample.values.tolist()
 
