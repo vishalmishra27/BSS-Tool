@@ -14,3 +14,11 @@ pdfplumber>=0.10.0
 =======
 >>>>>>> Stashed changes
 openpyxl>=3.1.0
+xlrd>=2.0.1
+
+# Azure Document Intelligence — scanned PDFs, images, DOCX, XLSX, PPTX
+azure-ai-documentintelligence>=1.0.0
+azure-core>=1.30.0
+
+# Optional: Outlook .msg email parsing
+# extract-msg>=0.28.0

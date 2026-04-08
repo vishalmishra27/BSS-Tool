@@ -14,7 +14,6 @@ import os
 import re
 import json
 import logging
-from datetime import datetime
 from groq import Groq
 from dotenv import load_dotenv
 
@@ -23,8 +22,8 @@ from pdf_parser import process_pdf   # identical copy from AAA 2
 load_dotenv()
 logger = logging.getLogger(__name__)
 
-_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 MODEL = "llama-3.3-70b-versatile"
+_client = None
 
 # ── Prompts (same intent as AAA 2 graph_rag.py) ────────────────────────────────
 
@@ -95,6 +94,16 @@ def _retrieve_chunks(chunks: list[dict], query: str, top_k: int = 12) -> list[di
 # ── LLM call ─────────────────────────────────────────────────────────────────
 
 def _call_llm(prompt: str, max_tokens: int = 4096, json_mode: bool = False) -> str:
+    global _client
+    if _client is None:
+        api_key = os.getenv("GROQ_API_KEY")
+        if not api_key:
+            raise RuntimeError(
+                "GROQ_API_KEY is not configured. OCR routes are available, but analysis "
+                "and extraction need a Groq API key in the backend environment."
+            )
+        _client = Groq(api_key=api_key)
+
     kwargs = dict(
         model=MODEL,
         messages=[{"role": "user", "content": prompt}],
@@ -123,9 +132,8 @@ class DocumentAnalyser:
 
     def add_document(self, doc_name: str, pdf_path: str) -> tuple[str, list[dict]]:
         """
-        Parse a PDF and store its text + chunks.
-        Identical to AAA 2's process_pdf() → build_graph_from_document() flow,
-        minus the graph/embedding step.
+        Parse a readable (text-layer) PDF and store its text + chunks.
+        Uses pdfplumber extraction — call this only for PDFs with a text layer.
         Returns (full_text, chunks).
         """
         full_text, chunks = process_pdf(pdf_path, chunk_size=3000)
@@ -133,6 +141,23 @@ class DocumentAnalyser:
         self.chunks_by_doc[doc_name] = chunks
         logger.info(f"[DocumentAnalyser] '{doc_name}' — {len(full_text)} chars, {len(chunks)} chunks")
         return full_text, chunks
+
+    def add_document_from_text(self, doc_name: str, full_text: str) -> tuple[str, list[dict]]:
+        """
+        Ingest pre-extracted text (e.g. from Azure Document Intelligence) and
+        store it alongside its chunks.  Use this for scanned PDFs, images,
+        DOCX, XLSX, PPTX, and any other format processed by document_intelligence.py.
+        Returns (full_text, chunks).
+        """
+        from pdf_parser import chunk_text, clean_text
+        cleaned = clean_text(full_text)
+        chunks = chunk_text(cleaned, chunk_size=3000)
+        self.full_text_by_doc[doc_name] = cleaned
+        self.chunks_by_doc[doc_name] = chunks
+        logger.info(
+            f"[DocumentAnalyser] '{doc_name}' (DI) — {len(cleaned)} chars, {len(chunks)} chunks"
+        )
+        return cleaned, chunks
 
     def document_loaded(self, doc_name: str) -> bool:
         return doc_name in self.full_text_by_doc

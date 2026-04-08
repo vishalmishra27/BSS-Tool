@@ -1,0 +1,157 @@
+================================================================================
+                     REQUIRED DOCUMENTS — SAMPLE OUTPUT
+================================================================================
+
+This file shows how the Required Documents Excel looks. It is auto-generated
+after the user approves TOD/TOE attributes, BEFORE the evidence folder is
+requested. Each row is one control. The "Required Documents" and "Document
+Descriptions" columns contain numbered lists inside a single cell.
+
+WORKFLOW:
+  1. preview_tod_attributes  →  User reviews & approves attributes
+  2. run_test_of_design (no evidence_folder)  →  Auto-generates this Excel
+  3. Agent shows document list + asks user for evidence folder path
+  4. run_test_of_design (with evidence_folder)  →  Runs the actual TOD test
+
+================================================================================
+
+EXCEL COLUMNS:
+  A — Control ID
+  B — Control Description
+  C — Control Attributes
+  D — Required Documents
+  E — Document Descriptions
+
+================================================================================
+
+ROW 1
+--------------------------------------------------------------------------------
+Control ID:           C-P2P-001
+
+Control Description:  Three-way match is performed between Purchase Order,
+                      Goods Receipt Note, and Invoice before payment is
+                      released. Discrepancies exceeding $500 require manager
+                      approval.
+
+Control Attributes:   1. Three-Way Match Verification — Verify that the
+                         system performs an automated three-way match between
+                         PO, GRN, and invoice amounts.
+                      2. Tolerance Threshold — Confirm the tolerance threshold
+                         is set at $500 and discrepancies above it trigger an
+                         exception workflow.
+                      3. Manager Approval for Exceptions — Verify that
+                         discrepancies above threshold are escalated to a
+                         manager and evidence of approval exists.
+
+Required Documents:   1. Purchase Order (PO)
+                      2. Goods Receipt Note (GRN)
+                      3. Vendor Invoice
+                      4. Three-Way Match Report
+                      5. Exception Approval Email/Screenshot
+
+Document              1. The original PO showing authorized amount, vendor,
+Descriptions:            line items, and approval signatures to verify the
+                         order was properly authorized.
+                      2. Confirms physical receipt of goods matching the PO
+                         quantity and specifications, signed by receiving
+                         personnel.
+                      3. The vendor invoice showing billed amount, payment
+                         terms, and line items to match against PO and GRN.
+                      4. System-generated report showing the automated
+                         three-way match result (match/mismatch status,
+                         variance amounts).
+                      5. Evidence of manager approval for any discrepancy
+                         exceeding the $500 tolerance threshold (email, ERP
+                         approval screenshot, or workflow log).
+
+================================================================================
+
+ROW 2
+--------------------------------------------------------------------------------
+Control ID:           C-P2P-002
+
+Control Description:  Vendor master data changes require dual authorization.
+                      All changes are logged in the ERP system audit trail.
+                      Quarterly review of vendor master changes is performed
+                      by the controller.
+
+Control Attributes:   1. Dual Authorization — Confirm that vendor master
+                         changes require a maker-checker (dual authorization)
+                         workflow in the ERP system.
+                      2. Audit Trail Logging — Verify the system logs all
+                         vendor master changes with user ID, timestamp, and
+                         field-level detail.
+                      3. Quarterly Review — Verify that the controller
+                         performs a quarterly review of all vendor master
+                         changes and signs off.
+
+Required Documents:   1. Vendor Master Change Log
+                      2. ERP Workflow Configuration Screenshot
+                      3. Maker-Checker Approval Evidence
+                      4. Quarterly Review Sign-off Report
+
+Document              1. System-generated audit trail report showing all
+Descriptions:            vendor master changes during the period with user ID,
+                         timestamp, old value, and new value.
+                      2. Screenshot of the ERP configuration showing that dual
+                         authorization is enabled for vendor master changes.
+                      3. Evidence showing both the initiator and approver for
+                         a sample of vendor master changes (ERP approval logs
+                         or workflow screenshots).
+                      4. The controller's quarterly review report with
+                         sign-off confirming all vendor master changes were
+                         reviewed and deemed appropriate.
+
+================================================================================
+
+ROW 3
+--------------------------------------------------------------------------------
+Control ID:           C-RTR-001
+
+Control Description:  Monthly journal entries above $10,000 require approval
+                      from the Finance Manager before posting. Supporting
+                      documentation must be attached to each entry.
+
+Control Attributes:   1. Approval Threshold — Verify that journal entries
+                         above $10,000 are flagged for Finance Manager
+                         approval before posting.
+                      2. Supporting Documentation — Confirm that each journal
+                         entry has supporting documentation attached (backup
+                         schedules, calculations, or source documents).
+                      3. Segregation of Duties — Verify the preparer and
+                         approver are different individuals.
+
+Required Documents:   1. Journal Entry Form / Voucher
+                      2. Finance Manager Approval Evidence
+                      3. Supporting Documentation / Backup Schedule
+                      4. ERP Journal Entry Posting Report
+                      5. User Access List (Segregation of Duties)
+
+Document              1. The journal entry form or ERP voucher showing the
+Descriptions:            account, amount, description, and preparer name.
+                      2. Evidence of the Finance Manager's approval for the
+                         journal entry (signature, email, or ERP workflow
+                         approval log).
+                      3. The backup schedule, calculation workpaper, or source
+                         document that supports the journal entry amount and
+                         account classification.
+                      4. System-generated report confirming the journal entry
+                         was posted, showing the posting date, document number,
+                         and status.
+                      5. A list of users with journal entry access to verify
+                         the preparer and approver are different individuals
+                         (segregation of duties).
+
+================================================================================
+
+NOTES:
+- In the actual Excel file, each numbered list appears in a SINGLE CELL with
+  line breaks (Alt+Enter in Excel). The cell has wrap_text enabled so all
+  items are visible.
+- The tool generates document lists using AI based on the control description
+  and approved testing attributes. The number and type of documents varies
+  per control.
+- The Excel file is styled with headers in dark blue (#2F5496) with white
+  text, thin borders on all cells, and wrap-text alignment.
+
+================================================================================

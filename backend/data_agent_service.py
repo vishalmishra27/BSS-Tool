@@ -19,7 +19,7 @@ from data_agent_tools import (
 load_dotenv()
 logger = logging.getLogger(__name__)
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+client = OpenAI(api_key=os.getenv("GROQ_API_KEY"))
 MODEL = "gpt-4o"
 
 SYSTEM_PROMPT = """You are the Data Management Agent for the BSS Migration Assurance Tool.

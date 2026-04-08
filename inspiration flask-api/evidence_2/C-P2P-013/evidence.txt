@@ -1,0 +1,14 @@
+Sample ID: S1
+Source Document: INV-2024-5612 / PO-89010 / GR-44590
+Test Date: 2024-06-18
+Tested By: Auditor - Priya Nair
+
+Invoice INV-2024-5612 from Global Parts Co. for $55,000. PO: $50,000. GR: 480 of 500 units.
+Variance: $5,000 = 10% — exceeds 2% tolerance. SAP blocked for three-way match failure.
+However, AP Clerk Sunita Rao processed manual override on 2024-05-25.
+Override reason: "Vendor says price increase was communicated verbally."
+No AP Supervisor or AP Manager approval found for the override.
+SAP config: any user with INVOICE_POST role can release blocked invoices by entering reason.
+No approval workflow triggered. Free-text reason codes (no standardized categories).
+AP Manager reviews overrides "periodically" — no schedule, no sign-off requirement.
+See attached Invoice_Override_Policy.txt — policy exists but is not enforced by the system.

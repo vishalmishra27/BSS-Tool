@@ -1,0 +1,14 @@
+trigger: "Assess controls against SOPs, validate control design against policy documents, onground check"
+title: "Control Assessment (OnGround Check)"
+steps:
+  - "Ensure RCM is loaded with load_rcm"
+  - "Run run_control_assessment(sop_folder='<path_to_sop_documents>')"
+  - "Review results — controls with <50% match may need design remediation"
+notes:
+  - "Requires a folder containing SOP/policy PDF or text documents"
+  - "Evaluates each control's description against the SOP content for alignment"
+  - "Returns match percentages — below 50% suggests gaps between design and documentation"
+tags:
+  - assessment
+  - sop
+  - design

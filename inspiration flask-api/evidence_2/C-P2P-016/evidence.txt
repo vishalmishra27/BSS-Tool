@@ -1,0 +1,11 @@
+Sample ID: S1
+Source Document: INV-2024-5580 / PO-89055 / GR-44601
+Test Date: 2024-06-19
+Tested By: Auditor - Priya Nair
+
+Invoice INV-2024-5580 for $6,750. PO: $6,750. GR: 145 of 150 units accepted.
+Invoice for 150 units vs GR 145 — quantity variance, tolerance breached.
+SAP placed invoice in suspense queue (status "Q"). AP Clerk contacted Procurement.
+Adjusted invoice to $6,525 (145 × $45). Resubmitted — passed three-way match.
+Suspense queue monitored daily. Items > 5 days escalated (automated aging alert).
+Tolerance: 2% — consistent with C-P2P-013.

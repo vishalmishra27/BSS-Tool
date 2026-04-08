@@ -1,0 +1,12 @@
+Sample ID: S1
+Source Document: GR-44590 / ZGR_DELAY Report 2024-05-23
+Test Date: 2024-06-16
+Tested By: Auditor - Sanjay Kulkarni
+
+Delivery for PO-89010 received at warehouse 2024-05-22 at 3:30 PM.
+GR-44590 entered in SAP on 2024-05-23 at 9:15 AM — ~18 hours after receipt (within 24hr).
+Automated daily report (ZGR_DELAY) runs at 6:00 AM, flags deliveries without GR after 24 hrs.
+Report for 2024-05-23: 2 items flagged — GR-44590 (resolved same day) and GR-44587 (36 hrs late).
+Report emailed automatically to Warehouse Supervisor Manoj Singh.
+Manoj reviews daily and follows up. No formal sign-off on the report — just follow-up emails.
+Gate scanning system feeds delivery timestamp to SAP for comparison.

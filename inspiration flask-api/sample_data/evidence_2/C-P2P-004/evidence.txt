@@ -1,0 +1,18 @@
+Sample ID: S1
+Source Document: Vendor #V-10267 / VEN-DDC-0267
+Test Date: 2024-06-12
+Tested By: Auditor - Sanjay Kulkarni
+
+New vendor "QuickParts Industrial Supplies" onboarded 2024-03-14.
+Due diligence checklist (VEN-DDC-v3) started by Buyer Meera Ghosh.
+Checklist items:
+  ✓ Background check — completed
+  ✗ Financial stability — blank, no D&B report on file
+  ✓ Compliance — trade license uploaded
+  ✗ Bank verification — no call-back performed, details taken from vendor email only
+  ✗ Conflict of interest — not completed
+Vendor activated in SAP 2024-03-15 with only 2 of 5 mandatory items completed.
+Vendor Management Lead Arjun Reddy signed off on the incomplete checklist.
+No system-level block prevents vendor activation without completed checklist —
+IT admin confirmed activation is a manual step independent of checklist status.
+Checklist template attached (see Vendor_Due_Diligence_Checklist_v3.txt).

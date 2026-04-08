@@ -1,0 +1,13 @@
+Sample ID: S1
+Source Document: PO-88955 / PO-89050 / ZME_DUP_RPT Screenshot
+Test Date: 2024-06-14
+Tested By: Auditor - Amit Verma
+
+Tested duplicate PO detection. PO-88955 exists for Acme Industrial, 200 units, $22,000.
+Created identical PO on 2024-05-20. SAP warning: "Potential duplicate detected."
+Warning is informational only — user clicked Continue, PO-89050 created.
+Duplicate flag visible in daily exception report (tcode ZME_DUP_RPT).
+Deepa confirmed she reviews the report "most mornings" but no formal schedule,
+no sign-off requirement, and no documented review procedure.
+SAP config: duplicate check on Vendor + Item + Qty + Amount, 30-day window.
+Detection works but it's a WARNING, not a BLOCK.

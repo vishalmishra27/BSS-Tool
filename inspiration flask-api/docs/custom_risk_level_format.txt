@@ -1,0 +1,139 @@
+================================================================================
+  CUSTOM RISK LEVEL — INPUT FORMAT SPECIFICATION
+================================================================================
+
+This document describes how to customise the risk level scoring model and
+how to override individual control risk levels.
+
+
+================================================================================
+  PART A: CUSTOMISING THE SCORING MODEL (WEIGHTS & BANDS)
+================================================================================
+
+The default scoring model uses weighted, non-linear scoring:
+
+  Input weights:    Low = 1,  Medium = 3,  High = 6
+  Formula:          Risk Score = Probability Score x Impact Score
+  Band thresholds:  Score 1-5 = Low, 6-17 = Medium, 18-35 = High, 36 = Critical
+
+The risk matrix is NOT independently hardcoded — it is always computed from
+the weights and bands.  If you change the weights or bands, the matrix
+auto-recomputes.
+
+
+1. CHANGING WEIGHTS VIA CHAT
+
+   Tell the agent:
+     "Change risk weights to Low=2, Medium=5, High=10"
+
+   Format: Low=<int>, Medium=<int>, High=<int>
+
+   The matrix will auto-recompute.  For example, with Low=2, Med=5, High=10:
+     High x High = 100 --> Critical (above all bands)
+     Medium x High = 50
+     Low x Low = 4
+
+
+2. CHANGING BAND THRESHOLDS VIA CHAT
+
+   Tell the agent:
+     "Change risk bands to 1-10=Low, 11-30=Medium, 31-60=High"
+
+   Format: <lower>-<upper>=<Level>, ...
+   Scores above the last upper bound automatically map to Critical.
+
+
+3. CHANGING BOTH
+
+   Tell the agent:
+     "Use custom risk scoring with weights Low=2, Medium=4, High=8
+      and bands 1-8=Low, 9-24=Medium, 25-50=High"
+
+
+================================================================================
+  PART B: OVERRIDING INDIVIDUAL CONTROL RISK LEVELS
+================================================================================
+
+After running risk level inference (infer_risk_level), you get a preview of
+all inferred values.  You can override them before approving.
+
+
+4. OVERRIDE VIA CHAT (single control)
+
+   Tell the agent:
+     "Change CC-01 risk level to High"
+     "Set CC-01 probability to Medium and impact to High"
+
+   If you provide both Probability and Impact, the Risk Level is auto-
+   recomputed using the scoring model.
+
+   If you provide only Risk Level, it is set directly (no recomputation).
+
+
+5. OVERRIDE VIA EXCEL RE-UPLOAD
+
+   a) Download the exported "inferred_risk_levels.xlsx" file
+   b) Edit the columns you want to change:
+      - "Probability" column (Low / Medium / High)
+      - "Impact" column (Low / Medium / High)
+      - "Risk Level" column (Low / Medium / High / Critical)
+   c) Upload the edited file back
+
+   If both Probability and Impact are present in a row, Risk Level is
+   auto-recomputed from them.  If only Risk Level is changed, it is
+   used as-is.
+
+
+6. EXCEL FORMAT FOR RISK LEVEL OVERRIDES
+
+   The Excel file must have at minimum:
+
+   +------------+-------------+--------+------------+
+   | Control ID | Probability | Impact | Risk Level |
+   +------------+-------------+--------+------------+
+   | CC-01      | High        | High   | Critical   |
+   | CC-02      | Medium      | Low    | Low        |
+   | CC-03      |             |        | High       |
+   +------------+-------------+--------+------------+
+
+   Rules:
+   - "Control ID" column is REQUIRED
+   - At least one of: "Risk Level", or both "Probability" + "Impact"
+   - If P and I are both filled, Risk Level is recomputed (P x I scoring)
+   - If only Risk Level is filled, it is used directly
+   - Valid Probability/Impact values: Low, Medium, High
+   - Valid Risk Level values: Low, Medium, High, Critical
+   - Leave cells blank to keep the inferred value unchanged
+
+
+7. AFTER OVERRIDING
+
+   After making changes (via chat or Excel), review the updated list.
+   Then tell the agent to apply:
+     "Apply the risk levels"
+
+   This writes the final values to the RCM and exports the normalised RCM.
+
+
+================================================================================
+  PART C: THE RISK MATRIX (FOR REFERENCE)
+================================================================================
+
+This matrix is auto-computed from the scoring weights and bands.
+With the default values (Low=1, Medium=3, High=6):
+
+                    Impact: Low    Impact: Medium    Impact: High
+  Prob: Low           Low (1)         Low (3)        Medium (6)
+  Prob: Medium        Low (3)        Medium (9)       High (18)
+  Prob: High        Medium (6)       High (18)      Critical (36)
+
+Key points:
+  - Critical is NOT a user input — it is system-computed only
+  - Critical only occurs when BOTH Probability AND Impact are High
+  - During sampling, Critical automatically maps to High
+
+Score bands (default):
+  Score  1 -  5  -->  Low
+  Score  6 - 17  -->  Medium
+  Score 18 - 35  -->  High
+  Score 36       -->  Critical

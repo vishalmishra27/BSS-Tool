@@ -1,0 +1,20 @@
+ACCOUNTS PAYABLE — ADJUSTMENTS AND CREDIT NOTE POLICY
+Version: 2.3 | Effective: January 2024 | Owner: Finance Controller
+
+1. APPROVAL THRESHOLDS
+   - Adjustments <= $1,000: AP Manager approval
+   - Adjustments $1,001 - $25,000: AP Manager + Finance Controller
+   - Adjustments > $25,000: AP Manager + Finance Controller + CFO
+
+2. SUPPORTING DOCUMENTATION
+   All adjustments require:
+   - Original invoice reference
+   - Reason for adjustment
+   - Supporting evidence (quality report, return confirmation, vendor acknowledgement)
+
+3. SYSTEM ENFORCEMENT
+   SAP workflow enforces dual approval for adjustments > $1,000.
+   Posting is blocked until all required approvals are obtained.
+
+4. ANNUAL REVIEW
+   Thresholds reviewed annually by Finance Controller. Last: January 2024.

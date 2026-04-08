@@ -1,0 +1,14 @@
+Sample ID: S1
+Source Document: SAP Config Screenshot / ME21N Test Log
+Test Date: 2024-06-14
+Tested By: Auditor - Amit Verma
+
+Attempted to create PO without a linked PR in SAP.
+IT Application Owner Raj Kumar demonstrated in SAP dev environment:
+1. ME21N — entered vendor, material, qty, price — left PR reference blank
+2. SAP hard error: "Purchase order must reference an approved requisition."
+3. PO creation blocked — could not save.
+4. With valid PR-20240315 → PO created successfully.
+Config (transaction OLME): "PO must have PR reference" = MANDATORY.
+No override possible without changing SAP config (requires IT change management).
+See attached SAP_OLME_Config.txt.

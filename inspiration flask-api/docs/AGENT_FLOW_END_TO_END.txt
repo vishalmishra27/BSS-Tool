@@ -1,0 +1,629 @@
+================================================================================
+              CONTROLXAI SOX AUDIT AGENT — END-TO-END FLOW
+================================================================================
+                         Last updated: 2026-03-23
+================================================================================
+
+
+TABLE OF CONTENTS
+─────────────────
+  1.  Architecture Overview
+  2.  Agent Reasoning Cycle
+  3.  State Management
+  4.  Memory System (3-tier)
+  5.  Path A — RCM-First Workflow
+  6.  Path B — Scoping-First Workflow
+  7.  TOD Flow — Detailed 3-Phase
+  8.  TOE Flow — Detailed 3-Phase
+  9.  Document List Generation
+  10. Evidence Validation
+  11. Attribute Preview & Editing
+  12. Suggestions Engine
+  13. Reflector
+  14. Tool Adapter & Slim Results
+  15. Progress Tracking
+  16. Playbook Store (RAG)
+  17. Server Architecture
+  18. Storage Layer
+  19. Tool Registry
+  20. Complete Tool List (26 tools)
+
+
+================================================================================
+1. ARCHITECTURE OVERVIEW
+================================================================================
+
+LangGraph StateGraph with 3 nodes:
+
+    ┌──────────┐     has tool calls?     ┌───────────┐
+    │  agent   │ ──────── YES ─────────► │   tools   │
+    │ (LLM)   │                          │ (execute) │
+    └────┬─────┘                          └─────┬─────┘
+         │  no tool calls                       │
+         ▼                              ┌───────────────┐
+       END                              │ extract_facts  │
+                                        └───────┬───────┘
+                                                └──► back to agent
+
+LLM: Azure OpenAI GPT-5.2
+Max iterations per message: ~25
+Context window: last 40 messages + semantic facts + plan scratchpad
+
+
+================================================================================
+2. AGENT REASONING CYCLE
+================================================================================
+
+  User message arrives
+       │
+       ▼
+  RuntimeStateManager.get_or_create(chat_id)
+  → Returns or creates AgentState (restores cache from Cosmos DB)
+       │
+       ▼
+  LangGraph graph.astream_events() — SSE stream to frontend
+       │
+       ▼
+  AGENT NODE (call_model):
+    a. Build dynamic system prompt from AgentState
+    b. Retrieve relevant playbooks via embedding similarity
+    c. Inject semantic facts + plan scratchpad
+    d. Window messages to last 40 (safe boundary)
+    e. Call LLM with all 26 tools bound
+    f. TOD/TOE mismatch guard
+    g. Append deterministic suggestions (replace LLM-generated)
+       │
+       ▼
+  ROUTE: tool_calls? → TOOLS NODE → EXTRACT_FACTS → back to AGENT
+         no tool_calls? → END (stream done)
+
+SSE events: token, tool_start, tool_end, done, error
+
+
+================================================================================
+3. STATE MANAGEMENT
+================================================================================
+
+AgentState (per session, in-memory):
+
+  RCM:           rcm_df, original_rcm_df, output_dir
+  Caches:        suggestions_cache, dedup_cache, tod_results, toe_results,
+                 sampling_results, comparison_results
+  TOD/TOE:       pending_tod_schemas, pending_toe_schemas, tod_schemas,
+                 tod_evidence_folder, pending_tod/toe_evidence_folder
+  Documents:     document_list_rows, evidence_validated
+  Scoping:       scoping_engine, scoping_phase, scoping_trial_balance_path,
+                 scoping_benchmark, scoping_materiality_pct, scoping_sop_paths,
+                 scoping_quantitative_results, scoping_awaiting_input,
+                 scoping_progress
+  Progress:      tool_progress
+  Session:       tool_call_count, plan_scratchpad, tool_results_cache, artifacts
+
+RuntimeStateManager: per-thread, LRU eviction, Cosmos DB restore on creation
+
+
+================================================================================
+4. MEMORY SYSTEM (3-tier)
+================================================================================
+
+  Tier 1 — Episodic: full conversation (windowed to last 40 messages)
+  Tier 2 — Semantic: auto-extracted facts (survives windowing, max 15)
+           Examples: "RCM loaded: 42 rows", "TOD: 8 PASS, 2 FAIL"
+  Tier 3 — Plan: free-form markdown scratchpad (LLM-maintained)
+
+
+================================================================================
+5. PATH A — RCM-FIRST WORKFLOW
+================================================================================
+
+  1. Load RCM (load_rcm) → Inspect (inspect_dataframe)
+  2. AI Gap Analysis (run_ai_suggestions) → Merge (merge_suggestions)
+  3. Deduplication (run_deduplication) → Remove (remove_duplicates)
+  4. Control Assessment (run_control_assessment) — optional
+  5. Test of Design (TOD) — 3-phase, see Section 7
+  6. Sampling (run_sampling_engine) — REQUIRED between TOD and TOE
+  7. Test of Effectiveness (TOE) — 3-phase, see Section 8
+  8. Save & export (save_excel)
+
+Natural sequence: Load → [Gap] → [Dedup] → TOD → Sampling → TOE → Save
+
+
+================================================================================
+6. PATH B — SCOPING-FIRST WORKFLOW
+================================================================================
+
+Phase-by-phase with user review at each step.
+At every phase: show results → upload prompt → user can download/modify/re-upload.
+
+  Step 1:  Ask for trial balance file path
+  Step 2:  Ingest (parse, normalise, categorise, benchmarks)
+           → Show accounts + upload prompt → STOP
+  Step 2b: User uploads modified Excel (iterate) or continues
+           → Ask for benchmark + materiality_pct
+  Step 3:  Quantitative analysis (materiality threshold, classify)
+           → Show results + upload prompt → STOP
+  Step 3b: Upload or continue
+  Step 4:  Qualitative analysis (risk factors, scoring)
+           → Show results + upload prompt → STOP
+  Step 4b: Upload or continue
+  Step 5:  Final scoping (7-rule matrix + LLM Rule 8 overrides)
+           → Show in-scope list + upload prompt → STOP
+  Step 5b: Upload or continue → ask for SOP/policy file paths
+  Step 6:  Downstream (process mapping, SOP extraction, RCM generation)
+           → Show RCM workbook
+  Step 7:  Auto-load generated RCM → suggest TOD as next step
+           → Continue with Path A from step 5
+
+
+================================================================================
+7. TOD FLOW — DETAILED 3-PHASE
+================================================================================
+
+  ┌─ 1. User says "run TOD" ────────────────────────────────────────────┐
+  │ Agent asks: "Use RCM from scoping, or upload a different one?"     │
+  └──────────────────────────────────────────────────────────────────────┘
+           │
+           ▼
+  ┌─ 2. Preview Attributes ─────────────────────────────────────────────┐
+  │                                                                      │
+  │ preview_tod_attributes() — no evidence folder needed                │
+  │                                                                      │
+  │ Inside:                                                              │
+  │   a. Get all Control IDs from RCM                                   │
+  │   b. Generate schemas in parallel (5 workers) for ALL controls     │
+  │   c. Store in state.pending_tod_schemas                             │
+  │   d. Export editable attributes Excel                                │
+  │   e. Return schemas to frontend (UI popup)                          │
+  │                                                                      │
+  │ Agent shows: attributes with serial numbers per control             │
+  │ Agent mentions: editable Excel download path                         │
+  │ UI buttons: [Modify Attributes] [Upload Modified Attributes]        │
+  │             [Approve & Run TOD]                                      │
+  └──────────────────────────────────────────────────────────────────────┘
+           │
+           ▼
+  ┌─ 3. User Reviews & Edits Attributes ────────────────────────────────┐
+  │                                                                      │
+  │ Three editing options:                                               │
+  │   a. Via chat: modify_attribute, add_attribute, remove_attribute    │
+  │   b. Via UI popup (frontend sends JSON to /tod-approval endpoint)  │
+  │   c. Via Excel upload: download editable Excel, bulk edit, upload   │
+  │      back via upload_modified_attributes tool                       │
+  └──────────────────────────────────────────────────────────────────────┘
+           │
+           ▼
+  ┌─ 4. PHASE 1 — Document List Generation ────────────────────────────┐
+  │                                                                      │
+  │ User approves → agent calls run_test_of_design() [NO evidence]     │
+  │                                                                      │
+  │ Inside:                                                              │
+  │   a. Check state.pending_tod_schemas exists                         │
+  │   b. Call generate_document_list_excel():                            │
+  │      - For each control: LLM generates required documents list     │
+  │      - Parallel (5 workers)                                         │
+  │      - Writes styled Excel:                                         │
+  │        [Control ID | Description | Attributes | Docs | Doc Descs]  │
+  │   c. Cache rows in state.document_list_rows                         │
+  │   d. Return: phase="document_list", awaiting_evidence_folder=True  │
+  │                                                                      │
+  │ Agent shows: document list Excel path                                │
+  │ Agent asks: "Please provide the TOD evidence folder path."          │
+  └──────────────────────────────────────────────────────────────────────┘
+           │
+           ▼
+  ┌─ 5. User Provides Evidence Folder ──────────────────────────────────┐
+  └──────────────────────────────────────────────────────────────────────┘
+           │
+           ▼
+  ┌─ 6. PHASE 2 — Evidence Validation ─────────────────────────────────┐
+  │                                                                      │
+  │ Agent calls: run_test_of_design(evidence_folder="/path/...")         │
+  │                                                                      │
+  │ Inside:                                                              │
+  │   a. Scan evidence files per control subfolder                      │
+  │   b. Create embeddings (ONE TIME) for evidence files + content      │
+  │      previews using text-embedding-ada-002                          │
+  │   c. Create embeddings for each Required Document from Phase 1     │
+  │   d. Cosine similarity: each document vs each evidence file         │
+  │   e. Build match report:                                             │
+  │                                                                      │
+  │      C-P2P-001:                                                      │
+  │        ✅ Purchase Order           ← matched to "PO_12345.pdf"      │
+  │        ✅ Goods Receipt Note       ← matched to "GRN_receipt.pdf"   │
+  │        ❌ Three-Way Match Report   ← NOT FOUND                      │
+  │                                                                      │
+  │ If ALL matched → auto-proceed to Phase 3                            │
+  │ If documents missing → return validation report:                    │
+  │   [Re-upload Folder] — fix evidence, provide new path, re-validate │
+  │   [Skip & Continue]  — call with skip_validation=true               │
+  └──────────────────────────────────────────────────────────────────────┘
+           │
+           ▼  (all matched, or user skipped)
+  ┌─ 7. PHASE 3 — Run Actual TOD Test ─────────────────────────────────┐
+  │                                                                      │
+  │ Automatic after validation passes or is skipped.                    │
+  │                                                                      │
+  │ Inside:                                                              │
+  │   a. Load evidence (TOD_Engine.load_tod_evidence_folder)            │
+  │   b. Normalise keys to match RCM Control IDs                       │
+  │   c. Build pre-approved schemas from state.pending_tod_schemas      │
+  │   d. Run test_all_tod() with progress callbacks (5 workers)         │
+  │   e. Cache: state.tod_results, state.tod_schemas                    │
+  │   f. Clear: state.pending_tod_schemas = None                        │
+  │   g. Export: 4_TOD_Results.xlsx → upload to Blob Storage            │
+  │                                                                      │
+  │ Agent shows: "TOD: X PASS, Y FAIL out of Z controls"               │
+  │ UI buttons: [Run Sampling] [Analyse TOD Results] [Save TOD Results] │
+  └──────────────────────────────────────────────────────────────────────┘
+
+
+================================================================================
+8. TOE FLOW — DETAILED 3-PHASE
+================================================================================
+
+  Scenario A — After TOD (schemas cached, NO preview needed):
+
+  ┌─ 1. PHASE 1 — Document List ───────────────────────────────────────┐
+  │ run_test_of_effectiveness() [NO evidence_folder]                   │
+  │ → Auto-generates Required Documents using cached TOD schemas       │
+  │ → Asks for TOE evidence folder (SEPARATE from TOD)                 │
+  └──────────────────────────────────────────────────────────────────────┘
+           │
+           ▼
+  ┌─ 2. PHASE 2 — Evidence Validation ─────────────────────────────────┐
+  │ run_test_of_effectiveness(evidence_folder="/path/...")              │
+  │ → Same validation as TOD (embeddings + cosine similarity)          │
+  │ → [Re-upload] or [Skip & Continue]                                  │
+  └──────────────────────────────────────────────────────────────────────┘
+           │
+           ▼
+  ┌─ 3. PHASE 3 — Run Actual TOE Test ─────────────────────────────────┐
+  │ → Multiple samples per control                                      │
+  │ → Filters to TOD-PASS controls                                      │
+  │ → Exports: 5_TOE_Workpaper.xlsx                                     │
+  └──────────────────────────────────────────────────────────────────────┘
+
+
+  Scenario B — Fresh TOE (no prior TOD, preview needed):
+
+  ┌─ 1. preview_toe_attributes() — generate schemas ───────────────────┐
+  │ → User reviews/edits/approves (same as TOD)                        │
+  └──────────────────────────────────────────────────────────────────────┘
+           │
+           ▼
+  ┌─ 2. PHASE 1 — Document list (no evidence_folder) ─────────────────┐
+  └──────────────────────────────────────────────────────────────────────┘
+           │
+           ▼
+  ┌─ 3. PHASE 2 — Evidence validation (with evidence_folder) ─────────┐
+  │ → [Re-upload] or [Skip & Continue]                                  │
+  └──────────────────────────────────────────────────────────────────────┘
+           │
+           ▼
+  ┌─ 4. PHASE 3 — Run actual TOE test ─────────────────────────────────┐
+  └──────────────────────────────────────────────────────────────────────┘
+
+
+================================================================================
+9. DOCUMENT LIST GENERATION
+================================================================================
+
+Module: agent/tools/document_list.py
+Function: generate_document_list_excel()
+NOT a standalone tool — called internally by TOD/TOE Phase 1.
+
+For each control:
+  → Sends to LLM: Control ID + Control Description + Attributes
+  → LLM returns: list of required documents with descriptions
+  → Parallel (5 workers)
+
+Excel output:
+  ┌──────────────┬─────────────────┬──────────────┬──────────────┬───────────────┐
+  │ Control ID   │ Control Desc    │ Attributes   │ Required     │ Document      │
+  │              │                 │              │ Documents    │ Descriptions  │
+  ├──────────────┼─────────────────┼──────────────┼──────────────┼───────────────┤
+  │ C-P2P-001    │ Three-way match │ 1. Match...  │ 1. PO        │ 1. Original   │
+  │              │ is performed... │ 2. Threshold │ 2. GRN       │    PO showing │
+  │              │                 │ 3. Approval  │ 3. Invoice   │    amount...  │
+  └──────────────┴─────────────────┴──────────────┴──────────────┴───────────────┘
+
+  Numbered lists in single cells with line breaks.
+  Headers: dark blue (#2F5496) with white text.
+  Rows cached in state.document_list_rows for Phase 2 evidence validation.
+
+
+================================================================================
+10. EVIDENCE VALIDATION
+================================================================================
+
+Module: agent/tools/evidence_validator.py
+Function: validate_evidence_against_documents()
+NOT a standalone tool — called internally by TOD/TOE Phase 2.
+
+How it works:
+  1. Scan evidence folder — files per control subfolder
+  2. Create embeddings (ONE TIME) for:
+     - Evidence files: "filename: content_preview"
+     - Required Documents: "name: description"
+     Using Azure OpenAI text-embedding-ada-002 (batch, 16 per call)
+  3. Cosine similarity: each required document vs each evidence file
+     Threshold: 0.45 (semantic — "PO_12345.pdf" matches "Purchase Order")
+  4. Build per-control match report
+
+Output:
+  C-P2P-001:  3/5 matched, 2 missing
+    ✅ Purchase Order              ← "PO_12345.pdf"    (0.87)
+    ✅ Goods Receipt Note          ← "GRN_receipt.pdf"  (0.79)
+    ✅ Vendor Invoice              ← "Invoice_V001.pdf" (0.82)
+    ❌ Three-Way Match Report      ← NOT FOUND
+    ❌ Exception Approval Email    ← NOT FOUND
+
+User options when documents missing:
+  [Re-upload Folder] — provide new/fixed evidence folder path
+  [Skip & Continue]  — proceed with skip_validation=true
+
+
+================================================================================
+11. ATTRIBUTE PREVIEW & EDITING
+================================================================================
+
+Schema structure per control:
+  control_id, worksteps[], attributes[{id, name, description}], sample_columns[]
+
+Three editing methods:
+
+  1. Chat (one at a time):
+     modify_attribute, add_attribute, remove_attribute
+
+  2. UI Popup:
+     Frontend shows editable popup → submits to /tod-approval or /toe-approval
+
+  3. Excel Upload (bulk):
+     Preview exports: Editable_Attributes_TOD_<ts>.xlsx
+     ┌──────────────┬──────────────┬─────────────────┬───────────────────────┐
+     │ Control ID   │ Attribute #  │ Attribute Name  │ Attribute Description │
+     ├──────────────┼──────────────┼─────────────────┼───────────────────────┤
+     │ C-P2P-001    │ 1            │ Three-Way Match │ Verify that...        │
+     │ C-P2P-001    │ 2            │ Tolerance       │ Confirm threshold...  │
+     └──────────────┴──────────────┴─────────────────┴───────────────────────┘
+     User downloads → edits → uploads via upload_modified_attributes
+     → Replaces ALL pending schemas → re-shows for approval
+
+After any edit: schema updated, preview cache rebuilt, shown for re-approval.
+
+
+================================================================================
+12. SUGGESTIONS ENGINE
+================================================================================
+
+Module: agent/core/suggestions.py
+Deterministic — replaces LLM-generated suggestions.
+
+State priority order:
+  1. Scoping intermediate → upload prompt
+  2. Pending schemas → [Modify] [Upload Excel] [Approve & Run]
+  3. Scoping complete → [Analyse] [Review RCM] [Run TOD]
+  4. After TOE → [Compare Results] [Save Workpaper]
+  5. After Sampling → [Run TOE] [Save]
+  6. After TOD → [Run Sampling] + [Remove Failed] + [Analyse] + [Save]
+  7. RCM loaded → context-specific (based on last_tool)
+
+
+================================================================================
+13. REFLECTOR
+================================================================================
+
+Module: agent/core/reflector.py
+Injects _agent_notes into tool results. Does NOT control flow.
+
+  - Phases 1 & 2 (document_list, evidence_validation): skipped
+  - Repeated tool calls (3+): loop warning
+  - High tool count (>15): wrap-up suggestion
+  - TOD 100% pass: anomaly flag
+  - TOD >50% fail: systemic warning
+  - TOE zero deviations: anomaly flag
+  - TOE not effective: PCAOB finding
+  - Dedup zero pairs in large RCM: threshold note
+  - Sampling unmatched frequencies: warning
+  - Scoping re-call: blocked
+
+
+================================================================================
+14. TOOL ADAPTER & SLIM RESULTS
+================================================================================
+
+Module: server/tool_adapter.py
+Wraps agent/tools as LangChain StructuredTools for LangGraph.
+
+Phase 1 & 2 results (document_list, evidence_validation): passed through as-is.
+Phase 3 (full test) results: slimmed for token efficiency.
+
+Slim tools:
+  load_rcm                  → strips rcm_rows
+  run_test_of_design        → strips per-control results (keeps pass/fail + doc list)
+  run_test_of_effectiveness → strips per-control details (keeps effectiveness + doc list)
+  run_sampling_engine       → strips per-control results (keeps totals)
+  run_sox_scoping_engine    → strips account lists (keeps counts + sample)
+
+Guards: tool call limit, read_file→load_rcm redirect, preconditions
+
+
+================================================================================
+15. PROGRESS TRACKING
+================================================================================
+
+Module: agent/core/progress.py
+
+  Scoping: per-phase + overall pipeline, smoothed ETA
+           Polled: GET /api/chats/{id}/scoping-progress (1.5s)
+
+  TOD/TOE: per-control, elapsed + ETA, controls done list
+           Polled: GET /api/chats/{id}/tool-progress (2s)
+
+Thread-safe (single shared lock). ETA: 70% new + 30% old.
+
+
+================================================================================
+16. PLAYBOOK STORE (RAG)
+================================================================================
+
+Module: agent/core/playbook_store.py
+Directory: agent/playbooks/*.yaml
+
+Startup: load YAML → embed triggers (ada-002) → numpy array.
+Per message: embed query → cosine similarity → top-3 injected into prompt.
+Reference only — LLM does NOT auto-execute.
+
+
+================================================================================
+17. SERVER ARCHITECTURE
+================================================================================
+
+FastAPI + Uvicorn
+
+Startup:
+  1. Cosmos DB (8 containers)
+  2. Azure Blob Storage + cache cleanup daemon
+  3. LangGraph SQLite checkpointer
+  4. Compile LangGraph agent
+  5. RuntimeStateManager
+  6. Azure OpenAI connectivity probe
+  7. Idle state eviction task (5 min)
+
+Key endpoints:
+  POST /api/chats/{id}/messages     — send message (SSE stream)
+  GET  /api/chats/{id}/messages     — get message history
+  GET  /api/chats/{id}/scoping-progress   — live scoping progress
+  GET  /api/chats/{id}/tool-progress      — live TOD/TOE progress
+  GET  /api/chats/{id}/session-results    — cached results (page refresh)
+  GET  /api/chats/{id}/workflow-state     — workflow state
+  POST /api/chats/{id}/tod-approval       — edited TOD schemas from UI
+  POST /api/chats/{id}/toe-approval       — edited TOE schemas from UI
+  POST /api/upload                        — file upload to Blob
+  POST /api/upload-folder                 — folder upload (evidence)
+  GET  /api/download?path=...             — download artifact
+  GET  /api/health                        — health check
+
+Security: CORS, internal API token guard, health endpoints open.
+
+
+================================================================================
+18. STORAGE LAYER
+================================================================================
+
+  Cosmos DB (8 containers):
+    Sessions, Messages, Agent-memory, Embeddings,
+    Context-cache (TTL=3600s), Users, Projects, Documents
+
+  Azure Blob Storage:
+    uploads/, evidence/, artifacts/
+    Cache cleanup daemon (TTL eviction)
+
+  SQLite:
+    LangGraph checkpoint state only
+
+
+================================================================================
+19. TOOL REGISTRY
+================================================================================
+
+Module: agent/tools/__init__.py
+Auto-discovery: scans agent/tools/*.py for Tool subclasses.
+
+Each tool: name, description, category, parameters, preconditions, execute()
+Returns: ToolResult(success, data, error, duration_seconds, artifacts, summary)
+
+
+================================================================================
+20. COMPLETE TOOL LIST (26 tools)
+================================================================================
+
+ANALYSIS (10):
+  preview_tod_attributes        — Generate TOD attributes for approval (no evidence needed)
+  preview_toe_attributes        — Generate TOE attributes for approval (no evidence needed)
+  run_test_of_design            — 3-phase: doc list → validate evidence → run TOD
+  run_test_of_effectiveness     — 3-phase: doc list → validate evidence → run TOE
+  run_ai_suggestions            — AI gap analysis on RCM
+  run_control_assessment        — Validate controls against SOPs
+  run_deduplication             — Find semantically duplicate risks/controls
+  run_sampling_engine           — Calculate sample sizes for TOE
+  run_sox_scoping_engine        — Multi-phase planning & scoping
+  run_quality_comparison        — Compare TOD vs TOE results
+
+DATA (10):
+  load_rcm                      — Load RCM Excel (smart header detection)
+  inspect_dataframe             — Show RCM info/head/stats
+  modify_rcm                    — Add/rename/delete columns, update, filter
+  merge_suggestions             — Merge approved AI suggestions into RCM
+  remove_duplicates             — Remove flagged duplicate controls
+  remove_failed_tod_controls    — Remove TOD-failed controls
+  modify_attribute              — Change attribute name/description
+  add_attribute                 — Add new attribute to a control
+  remove_attribute              — Remove attribute from a control
+  upload_modified_attributes    — Upload edited attributes Excel (bulk edits)
+
+FILESYSTEM (3):
+  read_file                     — Read non-RCM files
+  list_directory                — List files in a directory
+  web_search                    — Search the web
+
+UTILITY (3):
+  save_excel                    — Save RCM checkpoint
+  update_plan                   — Agent's working plan scratchpad
+  execute_python                — Ad-hoc Python on loaded RCM
+
+INTERNAL (not in registry, called by tools):
+  generate_document_list_excel  — Called by TOD/TOE Phase 1
+  validate_evidence_against_documents — Called by TOD/TOE Phase 2
+  export_attributes_excel       — Called by preview tools
+
+
+================================================================================
+COMPLETE TOD FLOW SUMMARY (single view)
+================================================================================
+
+  Load RCM
+       │
+       ▼
+  preview_tod_attributes()          ← no evidence folder
+       │
+       ▼
+  User reviews attributes           ← chat / UI popup / Excel upload
+       │
+       ▼
+  run_test_of_design()              ← PHASE 1: no evidence_folder
+  ├── Generate Required Documents Excel
+  ├── Cache doc list in state
+  └── Return: ask for evidence folder
+       │
+       ▼
+  User provides evidence folder
+       │
+       ▼
+  run_test_of_design(evidence_folder=...)  ← PHASE 2: evidence validation
+  ├── Create embeddings (ONE TIME)
+  ├── Compare evidence vs required documents
+  ├── If missing → show report → [Re-upload] or [Skip]
+  └── If all matched → auto-proceed
+       │
+       ▼
+  run_test_of_design(skip_validation=true)  ← PHASE 3: actual TOD test
+  OR auto-proceed from Phase 2
+  ├── Load & parse evidence files
+  ├── Evaluate with pre-approved schemas (5 workers)
+  ├── Export 4_TOD_Results.xlsx
+  └── Cache results + schemas for TOE reuse
+       │
+       ▼
+  run_sampling_engine()             ← REQUIRED before TOE
+       │
+       ▼
+  run_test_of_effectiveness()       ← same 3-phase flow (TOE)
+       │
+       ▼
+  Save final workpaper
+
+
+================================================================================
+END OF DOCUMENT
+================================================================================

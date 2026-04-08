@@ -1,0 +1,12 @@
+Sample ID: S1
+Source Document: CN-2024-0088 / INV-2024-5100 / QR-0556
+Test Date: 2024-06-20
+Tested By: Auditor - Amit Verma
+
+Credit Note CN-2024-0088 for $3,200 against INV-2024-5100.
+Reason: goods returned (15 units defective). QR-0556 supporting.
+Approved by AP Manager Lakshmi Pillai (email) and Finance Controller Anil Deshmukh (SAP).
+Both approvals with timestamps. Posted only after both approvals.
+SAP blocks posting until dual approval for adjustments > $1,000.
+Adjustments <= $1,000 require only AP Manager. Threshold reviewed annually.
+See attached AP_Adjustments_Policy_v2.3.txt.

@@ -1,0 +1,598 @@
+
+================================================================================
+  AUTONOMOUS SOX AUDIT AGENT — COMPREHENSIVE TEST & DRY RUN
+================================================================================
+
+Timestamp : 2026-03-18 14:59:44
+Python    : 3.12.4 | packaged by Anaconda, Inc. | (main, Jun 18 2024, 10:07:17) [Clang 14.0.6 ]
+Working dir: /Users/rishi/Downloads/16MM/ControlXAI/flask-api
+
+================================================================================
+  1. IMPORT VERIFICATION
+================================================================================
+
+  [PASS] import agent.types
+  [PASS] import agent.config
+  [PASS] import agent.utils
+  [PASS] import agent.llm
+  [PASS] import agent.tools.base
+  [PASS] import agent.tools (discover)
+  [PASS] import agent.core.memory
+  [PASS] import agent.core.executor
+  [PASS] import agent.core.reflector
+  [PASS] import agent.prompts.system
+  [PASS] import agent.core.loop
+  [PASS] import agent (factory)
+
+================================================================================
+  2. TOOL DISCOVERY & REGISTRY
+================================================================================
+
+  Discovered 25 tools:
+
+    add_attribute                       [utility   ]  params=['control_id', 'name', 'description', 'position']
+    execute_python                      [utility   ]  params=['code']
+    inspect_dataframe                   [data      ]  params=['mode', 'column', 'n', 'query_expr']
+    list_directory                      [filesystem]  params=['path', 'extension', 'recursive']
+    load_rcm                            [data      ]  params=['file_path']
+    merge_suggestions                   [data      ]  params=['indices']
+    modify_attribute                    [utility   ]  params=['control_id', 'attribute_no', 'name', 'description']
+    modify_rcm                          [data      ]  params=['action', 'column_name', 'new_name', 'value', 'condition_column', 'condition_value', 'updates', 'ascending', 'query_expr']
+    preview_tod_attributes              [analysis  ]  params=['evidence_folder']
+    preview_toe_attributes              [analysis  ]  params=['evidence_folder']
+    read_file                           [filesystem]  params=['file_path', 'max_lines', 'encoding']
+    remove_attribute                    [utility   ]  params=['control_id', 'attribute_no']
+    remove_duplicates                   [data      ]  params=['removals']
+    remove_failed_tod_controls          [data      ]  params=['save_removed']
+    run_ai_suggestions                  [analysis  ]  params=['industry']
+    run_control_assessment              [analysis  ]  params=['policy_paths', 'sop_paths']
+    run_deduplication                   [analysis  ]  params=[]
+    run_quality_comparison              [analysis  ]  params=['project_folder', 'company_name', 'prepared_by', 'reviewed_by']
+    run_sampling_engine                 [analysis  ]  params=['engine_type', 'custom_file_path', 'frequency_overrides']
+    run_sox_scoping_engine              [analysis  ]  params=['trial_balance_path', 'sop_paths', 'benchmark', 'materiality_pct', 'run_downstream', 'output_filename', 'max_workers', 'top_k_chunks', 'override_excel_path']
+    run_test_of_design                  [analysis  ]  params=['evidence_folder']
+    run_test_of_effectiveness           [analysis  ]  params=['evidence_folder', 'company_name', 'prepared_by', 'reviewed_by']
+    save_excel                          [utility   ]  params=['step_name']
+    update_plan                         [utility   ]  params=['plan_text']
+    web_search                          [utility   ]  params=['query', 'num_results']
+  [FAIL] All 19 tools discovered: Expected 19, got 25
+           AssertionError: Expected 19, got 25
+  [PASS] Tool 'load_rcm' registered
+  [PASS] Tool 'inspect_dataframe' registered
+  [PASS] Tool 'modify_rcm' registered
+  [PASS] Tool 'merge_suggestions' registered
+  [PASS] Tool 'remove_duplicates' registered
+  [PASS] Tool 'run_ai_suggestions' registered
+  [PASS] Tool 'run_control_assessment' registered
+  [PASS] Tool 'run_deduplication' registered
+  [PASS] Tool 'run_test_of_design' registered
+  [PASS] Tool 'run_test_of_effectiveness' registered
+  [PASS] Tool 'preview_toe_attributes' registered
+  [PASS] Tool 'run_sampling_engine' registered
+  [PASS] Tool 'run_sox_scoping_engine' registered
+  [PASS] Tool 'list_directory' registered
+  [PASS] Tool 'read_file' registered
+  [PASS] Tool 'save_excel' registered
+  [PASS] Tool 'update_plan' registered
+  [PASS] Tool 'execute_python' registered
+  [PASS] Tool 'web_search' registered
+
+================================================================================
+  3. OPENAI FUNCTION-CALLING SCHEMAS
+================================================================================
+
+  [PASS] Schema 'add_attribute' has type=function
+  [PASS] Schema 'add_attribute' has function.name
+  [PASS] Schema 'add_attribute' has parameters.type=object
+  [PASS] Schema 'execute_python' has type=function
+  [PASS] Schema 'execute_python' has function.name
+  [PASS] Schema 'execute_python' has parameters.type=object
+  [PASS] Schema 'inspect_dataframe' has type=function
+  [PASS] Schema 'inspect_dataframe' has function.name
+  [PASS] Schema 'inspect_dataframe' has parameters.type=object
+  [PASS] Schema 'list_directory' has type=function
+  [PASS] Schema 'list_directory' has function.name
+  [PASS] Schema 'list_directory' has parameters.type=object
+  [PASS] Schema 'load_rcm' has type=function
+  [PASS] Schema 'load_rcm' has function.name
+  [PASS] Schema 'load_rcm' has parameters.type=object
+  [PASS] Schema 'merge_suggestions' has type=function
+  [PASS] Schema 'merge_suggestions' has function.name
+  [PASS] Schema 'merge_suggestions' has parameters.type=object
+  [PASS] Schema 'modify_attribute' has type=function
+  [PASS] Schema 'modify_attribute' has function.name
+  [PASS] Schema 'modify_attribute' has parameters.type=object
+  [PASS] Schema 'modify_rcm' has type=function
+  [PASS] Schema 'modify_rcm' has function.name
+  [PASS] Schema 'modify_rcm' has parameters.type=object
+  [PASS] Schema 'preview_tod_attributes' has type=function
+  [PASS] Schema 'preview_tod_attributes' has function.name
+  [PASS] Schema 'preview_tod_attributes' has parameters.type=object
+  [PASS] Schema 'preview_toe_attributes' has type=function
+  [PASS] Schema 'preview_toe_attributes' has function.name
+  [PASS] Schema 'preview_toe_attributes' has parameters.type=object
+  [PASS] Schema 'read_file' has type=function
+  [PASS] Schema 'read_file' has function.name
+  [PASS] Schema 'read_file' has parameters.type=object
+  [PASS] Schema 'remove_attribute' has type=function
+  [PASS] Schema 'remove_attribute' has function.name
+  [PASS] Schema 'remove_attribute' has parameters.type=object
+  [PASS] Schema 'remove_duplicates' has type=function
+  [PASS] Schema 'remove_duplicates' has function.name
+  [PASS] Schema 'remove_duplicates' has parameters.type=object
+  [PASS] Schema 'remove_failed_tod_controls' has type=function
+  [PASS] Schema 'remove_failed_tod_controls' has function.name
+  [PASS] Schema 'remove_failed_tod_controls' has parameters.type=object
+  [PASS] Schema 'run_ai_suggestions' has type=function
+  [PASS] Schema 'run_ai_suggestions' has function.name
+  [PASS] Schema 'run_ai_suggestions' has parameters.type=object
+  [PASS] Schema 'run_control_assessment' has type=function
+  [PASS] Schema 'run_control_assessment' has function.name
+  [PASS] Schema 'run_control_assessment' has parameters.type=object
+  [PASS] Schema 'run_deduplication' has type=function
+  [PASS] Schema 'run_deduplication' has function.name
+  [PASS] Schema 'run_deduplication' has parameters.type=object
+  [PASS] Schema 'run_quality_comparison' has type=function
+  [PASS] Schema 'run_quality_comparison' has function.name
+  [PASS] Schema 'run_quality_comparison' has parameters.type=object
+  [PASS] Schema 'run_sampling_engine' has type=function
+  [PASS] Schema 'run_sampling_engine' has function.name
+  [PASS] Schema 'run_sampling_engine' has parameters.type=object
+  [PASS] Schema 'run_sox_scoping_engine' has type=function
+  [PASS] Schema 'run_sox_scoping_engine' has function.name
+  [PASS] Schema 'run_sox_scoping_engine' has parameters.type=object
+  [PASS] Schema 'run_test_of_design' has type=function
+  [PASS] Schema 'run_test_of_design' has function.name
+  [PASS] Schema 'run_test_of_design' has parameters.type=object
+  [PASS] Schema 'run_test_of_effectiveness' has type=function
+  [PASS] Schema 'run_test_of_effectiveness' has function.name
+  [PASS] Schema 'run_test_of_effectiveness' has parameters.type=object
+  [PASS] Schema 'save_excel' has type=function
+  [PASS] Schema 'save_excel' has function.name
+  [PASS] Schema 'save_excel' has parameters.type=object
+  [PASS] Schema 'update_plan' has type=function
+  [PASS] Schema 'update_plan' has function.name
+  [PASS] Schema 'update_plan' has parameters.type=object
+  [PASS] Schema 'web_search' has type=function
+  [PASS] Schema 'web_search' has function.name
+  [PASS] Schema 'web_search' has parameters.type=object
+
+  Total schemas generated: 25
+  All schemas JSON-serialisable: 
+  YES
+
+================================================================================
+  4. TYPES & STATE
+================================================================================
+
+  [PASS] AgentState() creates with defaults
+  [PASS] AgentState.reset() clears all fields
+  [PASS] ToolResult construction
+  [PASS] ToolParameter with enum
+  [PASS] ToolCategory.ANALYSIS exists
+  [PASS] ToolCategory.DATA exists
+  [PASS] ToolCategory.FILESYSTEM exists
+  [PASS] ToolCategory.UTILITY exists
+
+================================================================================
+  5. CONFIG
+================================================================================
+
+  openai_model     = gpt-5.2-chat
+  max_rounds       = 25
+  max_retries      = 2
+  retry_delay      = 2.0
+  max_context_msgs = 40
+  api_key          = 808cf0ccab84...a7e2c433
+  [PASS] Config is frozen (immutable)
+  [PASS] Config singleton returns same object
+
+================================================================================
+  6. UTILITY FUNCTIONS
+================================================================================
+
+  [PASS] sanitize_for_json: NaN → None
+  [PASS] sanitize_for_json: np.int64 → int
+  [PASS] sanitize_for_json: nested dict/list
+  [PASS] normalize_rcm_columns: 'risk id' → 'Risk Id'
+  [PASS] normalize_rcm_columns: 'control_id' → 'Control Id'
+  [PASS] normalize_rcm_columns: 'Process' unchanged
+  [PASS] parse_indices: '1,3,5' → [1,3,5]
+  [PASS] parse_indices: '1-5' → [1,2,3,4,5]
+  [PASS] parse_indices: 'all' with max=3 → [1,2,3]
+  [PASS] parse_indices: 'none' → []
+  [PASS] display_table: produces ASCII table
+
+================================================================================
+  7. MEMORY SYSTEM
+================================================================================
+
+  [PASS] Memory: user message added
+  [PASS] Memory: assistant message added
+  [PASS] Memory: tool result added
+  [PASS] Memory: auto-extracted fact for load_rcm
+  [PASS] Memory: auto-extracted fact for ai_suggestions
+  [PASS] Memory: auto-extracted fact for TOD
+
+  Semantic facts (3):
+    • RCM loaded: 28 rows, 3 columns
+    • AI suggestions: 12 generated
+    • TOD: 16 PASS, 2 FAIL out of 18
+  [PASS] Memory: build_context includes facts
+  [PASS] Memory: build_context includes plan
+
+  Context messages: 9
+    [user      ] SESSION FACTS (persisted):
+  - RCM loaded: 28 rows, 3 columns
+  - AI suggestions...
+    [assistant ] Acknowledged....
+    [user      ] YOUR WORKING PLAN:
+## My Plan
+- [x] Load RCM
+- [ ] Run AI...
+    [assistant ] Plan noted....
+    [user      ] Load my RCM...
+    [assistant ] I'll load it now....
+    [tool      ] {"success": true, "rows": 28, "columns": ["Process", "Control Id", "Risk Id"]}...
+    [tool      ] {"success": true, "suggestion_count": 12}...
+    [tool      ] {"success": true, "controls_evaluated": 18, "passed": 16, "failed": 2}...
+
+================================================================================
+  8. REFLECTOR — ADVISORY NOTES
+================================================================================
+
+
+--- TOD: 100% pass rate anomaly ───────────────────────────────────────────
+
+  Result: {"controls_evaluated": 15, "passed": 15, "failed": 0}
+  Notes:  ['ANOMALY: 100% pass rate across 15 controls is unusually high. Verify evidence quality and completeness before accepting.']
+  [PASS] Reflector: catches 100% TOD pass rate
+
+--- TOE: all effective anomaly ────────────────────────────────────────────
+
+  Result: {"controls_evaluated": 8, "effective": 8, "effective_with_exceptions": 0, "not_effective": 0}
+  Notes:  ['ANOMALY: All 8 controls effective with zero deviations. Verify sample selection represents genuine transactions.']
+  [PASS] Reflector: catches all-effective TOE
+
+--- Dedup: zero pairs in 50-row RCM ───────────────────────────────────────
+
+  Result: {"pair_count": 0}
+  Notes:  ['NOTE: Zero duplicates found in 50-row RCM. This may be correct, or matching criteria may be too strict.']
+  [PASS] Reflector: flags zero dedup in large RCM
+
+--- Tool error handling ───────────────────────────────────────────────────
+
+  Result: {"error": "File not found: /bad/path.xlsx"}
+  Notes:  ['TOOL ERROR: File not found: /bad/path.xlsx.']
+  [PASS] Reflector: advises on tool error
+
+--- Normal result (no anomaly) ────────────────────────────────────────────
+
+  Result: {"controls_evaluated": 10, "passed": 8, "failed": 2}
+  Notes:  []
+  [PASS] Reflector: no spurious notes for normal result
+
+================================================================================
+  9. DYNAMIC SYSTEM PROMPT
+================================================================================
+
+  Empty state prompt (29930 chars):
+
+You are an autonomous SOX (Sarbanes-Oxley) audit agent. You help auditors by analysing Risk Control Matrices, identifying gaps, assessing controls, and testing effectiveness.
+
+CURRENT STATE:
+RCM: not loaded yet
+Tool calls this session: 0
+
+No working plan yet. For complex goals, consider creating one with update_plan.
+
+AVAILABLE TOOLS:
+TOOLS: [test_tool]
+
+HOW YOU WORK:
+1. REASON before acting. Explain what you are about to do and why.
+2. For complex, multi-step goals, create a working plan first using the update_plan tool. Update it as you learn more. The plan is YOUR scratchpad — follow it, re
+  ...(truncated)
+  [PASS] Prompt: contains 'not loaded yet' for empty state
+  [PASS] Prompt: contains 'No working plan'
+  [FAIL] Prompt: does NOT hardcode step order: hardcoded Step 1
+           AssertionError: hardcoded Step 1
+
+
+  Loaded state prompt (30064 chars):
+
+You are an autonomous SOX (Sarbanes-Oxley) audit agent. You help auditors by analysing Risk Control Matrices, identifying gaps, assessing controls, and testing effectiveness.
+
+CURRENT STATE:
+RCM loaded: 3 rows, 2 columns
+  Processes: 2 unique
+Output dir: /tmp/sox_agent_test
+AI suggestions cached: 2 items
+Tool calls this session: 7
+
+YOUR WORKING PLAN (you wrote this — follow, revise, or deviate as needed):
+## Audit Plan
+- [x] Load RCM
+- [ ] Run dedup
+
+AVAILABLE TOOLS:
+TOOLS: [16 tools]
+
+HOW YOU WORK:
+1. REASON before acting. Explain what you are about to do and why.
+2. For complex, multi-step goals, create a working plan first using the update_plan tool. Update it as you learn more. The plan is YOUR scratchpad — follow it, revise it, or deviate as circumstances require.
+3. After each tool r
+  ...(truncated)
+  [PASS] Prompt: shows row count
+  [PASS] Prompt: shows process count
+  [PASS] Prompt: shows plan scratchpad
+  [PASS] Prompt: shows suggestions cache
+
+================================================================================
+  10. TOOL PRECONDITIONS (Guards)
+================================================================================
+
+  [PASS] Precondition 'inspect_dataframe' blocks without RCM
+           → "No RCM loaded. Use load_rcm first."
+  [PASS] Precondition 'modify_rcm' blocks without RCM
+           → "No RCM loaded."
+  [PASS] Precondition 'merge_suggestions' blocks without RCM
+           → "No RCM loaded."
+  [PASS] Precondition 'remove_duplicates' blocks without RCM
+           → "No RCM loaded."
+  [PASS] Precondition 'run_ai_suggestions' blocks without RCM
+           → "No RCM loaded. Use load_rcm first."
+  [PASS] Precondition 'run_control_assessment' blocks without RCM
+           → "No RCM loaded. Use load_rcm first."
+  [PASS] Precondition 'run_deduplication' blocks without RCM
+           → "No RCM loaded. Use load_rcm first."
+  [PASS] Precondition 'run_test_of_design' blocks without RCM
+           → "No RCM loaded. Use load_rcm first."
+  [PASS] Precondition 'run_test_of_effectiveness' blocks without RCM
+           → "No RCM loaded. Use load_rcm first."
+  [PASS] Precondition 'save_excel' blocks without RCM
+           → "No RCM loaded."
+  [PASS] No precondition for 'load_rcm'
+  [PASS] No precondition for 'list_directory'
+  [PASS] No precondition for 'read_file'
+  [PASS] No precondition for 'execute_python'
+  [PASS] No precondition for 'web_search'
+  [PASS] No precondition for 'update_plan'
+  [PASS] merge_suggestions blocks without suggestions_cache
+           → "No suggestions cached. Run run_ai_suggestions first."
+
+================================================================================
+  11. SIMULATED TOOL EXECUTIONS
+================================================================================
+
+
+--- update_plan ───────────────────────────────────────────────────────────
+
+  Result: success=True, summary='Working plan updated'
+  State.plan_scratchpad:
+## Plan
+- [ ] Load RCM
+- [ ] Run dedup
+  [PASS] update_plan sets scratchpad
+
+--- list_directory ────────────────────────────────────────────────────────
+
+  Result: success=True
+  Items found: 15
+    Document_Intelligence.py                 66.2 KB
+    __pycache__/                             ? KB
+    agent/                                   ? KB
+    api.py                                   42.7 KB
+    archive/                                 ? KB
+  [PASS] list_directory lists .py files
+
+--- read_file ─────────────────────────────────────────────────────────────
+
+  Result: success=True, type=.py
+  Total lines: 156
+  Content preview: """
+Shared data types for the autonomous SOX audit agent.
+
+All dataclasses, enums, and type aliases used across the agen...
+  [PASS] read_file reads types.py
+
+--- execute_python ────────────────────────────────────────────────────────
+
+  Result: success=True
+  result value: {'answer': 42, 'series': [1, 2, 3]}
+  stdout: None
+  [PASS] execute_python runs code and returns result
+
+--- execute_python: DataFrame reassignment ────────────────────────────────
+
+  Result: success=True
+  New df_shape: [3, 2]
+  [PASS] execute_python updates state.rcm_df when df reassigned
+
+--- modify_rcm: add_column ────────────────────────────────────────────────
+
+  Result: success=True, summary='Added column 'Status''
+  Columns: ['Process', 'Risk Id', 'Status']
+  [PASS] modify_rcm: add_column works
+
+--- modify_rcm: rename_column ─────────────────────────────────────────────
+
+  Result: success=True, summary='Renamed 'Status' -> 'Review_Status''
+  [PASS] modify_rcm: rename_column works
+
+--- modify_rcm: conditional update_values ─────────────────────────────────
+
+  Result: success=True, rows_updated=1
+  [PASS] modify_rcm: conditional update works
+
+================================================================================
+  12. EXECUTOR
+================================================================================
+
+  inspect_dataframe with no RCM: success=False, error='Precondition failed: No RCM loaded. Use load_rcm first.'
+  [PASS] Executor: precondition failure
+  nonexistent_tool: success=False, error='Unknown tool: nonexistent_tool'
+  [PASS] Executor: unknown tool
+  inspect_dataframe (info): success=True
+    shape = {'rows': 1, 'columns': 2}
+    duration = 0.001s
+  [PASS] Executor: valid tool execution
+
+================================================================================
+  13. FACTORY: create_agent()
+================================================================================
+
+  AgentLoop created: AgentLoop
+  Registry size: 25 tools
+  State type: AgentState
+  Memory type: Memory
+  Executor type: Executor
+  Reflector type: Reflector
+  LLM type: LLMClient
+  [PASS] Factory: creates AgentLoop
+  [PASS] Factory: state is fresh
+  [FAIL] Factory: registry has 19 tools: got 25
+           AssertionError: got 25
+
+================================================================================
+  14. CAPABILITY SUMMARY (shown to LLM)
+================================================================================
+
+[ANALYSIS]
+  - run_ai_suggestions: Run AI gap analysis to identify missing risks and controls in the RCM. Generates suggestions based on industry best practices. Results are cached — call merge_suggestions afterwards to apply.
+  - run_control_assessment: Run OnGround Check: validate RCM controls against policy and SOP documents. Checks whether each control is documented in the provided policies/SOPs and identifies gaps. Provide at least one policy or SOP file path.
+  - run_deduplication: Analyze the RCM for semantically duplicate risks and controls. Uses AI to compare entries within each process group. Results are cached — call remove_duplicates afterwards to apply.
+  - preview_tod_attributes: Generate and preview TOD testing attributes for user approval BEFORE running the full Test of Design. Shows the LLM-generated attributes, worksteps, and sample columns per control in a reviewable format. The user can then edit and approve them via the UI before proceeding.
+  - preview_toe_attributes: Generate and preview TOE testing attributes for user approval BEFORE running the full Test of Effectiveness. Shows the LLM-generated attributes, worksteps, and sample columns per control in a reviewable format. The user can then edit and approve them via the UI before proceeding.
+  - run_quality_comparison: Run a Quality Comparison: autonomously executes the full SOX audit pipeline (TOD with auto-approved schemas -> Sampling -> TOE), then compares our tool's results against a human auditor's pre-existing workpapers. Produces a comparison report identifying gaps in the human's work at three levels: per-control verdict, per-attribute, and per-sample. Requires a single project folder containing subfolders: RCM/ (with the RCM Excel), evidence/TOD/ and evidence/TOE/ (with Control ID subfolders), OutputWork/TOD/ (human's TOD workpaper Excel), and OutputWork/TOE/ (human's TOE workpaper Excel).
+  - run_sampling_engine: Determine the number of samples required per control for the Test of Operating Effectiveness (TOE) using the KPMG sampling methodology or a custom sampling table. Uses each control's 'Control Frequency' and 'risk_level' columns to look up the required sample count, then writes the result into the 'count_of_samples' column. Run this BEFORE the TOE stage.
+  - run_sox_scoping_engine: Run the SOX Scoping Engine (from folder 'sox_package 2') using dynamic input files. Accepts a trial balance file path and optional SOP/policy paths provided at runtime. No hardcoded input files are used.
+  - run_test_of_design: Run Test of Design (TOD) — this is NOT Test of Effectiveness (TOE). TOD evaluates whether controls are adequately DESIGNED to mitigate risks (1 sample per control, PASS/FAIL). Use this when the user says 'TOD', 'test of design', or 'design test'. Do NOT use run_test_of_effectiveness or preview_toe_attributes for TOD.
+  - run_test_of_effectiveness: Run Test of Operating Effectiveness (TOE) — this is NOT Test of Design (TOD). TOE evaluates whether controls OPERATED EFFECTIVELY in practice using multiple samples per control. Use this ONLY when the user says 'TOE', 'test of effectiveness', or 'effectiveness test'. Do NOT use this when the user asks for TOD/test of design — use run_test_of_design instead.
+[DATA]
+  - inspect_dataframe: Quick inspection of the current RCM DataFrame. Modes: 'info' (shape, dtypes, nulls), 'head'/'tail' (first/last N rows), 'describe' (statistics), 'columns' (list all columns), 'value_counts' (unique values for a column), 'sample' (random N rows), 'query' (filter with pandas query syntax), 'full' (return all rows, capped at 500 for context safety).
+  - load_rcm: Load an RCM Excel or CSV file into the working state. Returns row count, columns, and a preview of the first 5 rows.
+  - merge_suggestions: Merge user-selected AI suggestions into the RCM. Call after run_ai_suggestions and after the user has chosen which to keep.
+  - modify_rcm: Modify the current RCM DataFrame. Actions: add_column, rename_column, update_values (case-insensitive conditional), delete_column, delete_rows (by condition or query), bulk_update (multiple columns at once), sort, filter_view (read-only filtered view).
+  - remove_duplicates: Remove duplicate rows from the RCM based on user decisions. Call after run_deduplication and user review.
+  - remove_failed_tod_controls: Remove controls that FAILED the Test of Design (TOD) from the RCM. This creates a clean RCM containing only PASS controls, which can then be used directly for Sampling and TOE. Optionally saves the removed controls to a separate file for audit trail.
+[FILESYSTEM]
+  - list_directory: List files and folders in a directory, optionally filtered by extension. Use recursive=true to walk subdirectories. Use this to find RCM files, evidence folders, or policy/SOP PDFs.
+  - read_file: Read the contents of a file. Supports text files (.txt, .csv, .json, .py, .md, .log), Excel (.xlsx returns first sheet as table), and PDF (.pdf extracts text). Returns the first 200 lines by default. NOTE: Do NOT use this for RCM files — use load_rcm instead, which performs smart header detection, column mapping, and marker normalisation.
+[UTILITY]
+  - save_excel: Save the current RCM state to an Excel checkpoint file.
+  - update_plan: Create or update your working plan. Use this to organise multi-step goals. Write markdown with checkboxes for tracking. The plan is YOUR scratchpad — the system will show it back to you each turn.
+  - add_attribute: Add a new testing attribute to a control during the TOD/TOE preview stage. Provide the control ID, attribute name, description, and optionally the position (serial number) where it should be inserted. If no position is given, the attribute is appended at the end.
+  - modify_attribute: Modify an existing testing attribute's name or description for a control during the TOD/TOE preview stage. Provide the control ID and attribute number (e.g. 1, 2, 3) along with the updated name and/or description.
+  - remove_attribute: Remove a testing attribute from a control during the TOD/TOE preview stage. Provide the control ID and the attribute serial number to remove.
+  - execute_python: Execute a Python code snippet for ad-hoc RCM data analysis. Pre-loaded variables: df (current RCM DataFrame), pd, np, os, json, math, datetime, re, openpyxl. Assign to 'result' to return structured data. If you reassign 'df', the RCM will be updated.
+  - web_search: Search the web for SOX compliance, PCAOB standards, COSO framework, audit procedures, and general knowledge. Uses DuckDuckGo + LLM knowledge.
+  [PASS] Capability summary grouped by category
+
+================================================================================
+  15. OLD (sox_agent.py) vs NEW (agent/) COMPARISON
+================================================================================
+
+  Aspect                              OLD (sox_agent.py)                            NEW (agent/)                                 
+  ----------------------------------- --------------------------------------------- ---------------------------------------------
+  Architecture                        Monolithic 1813-line file                     20 files across 4 packages (~3500 lines)     
+  Tool count                          10 tools (later 15)                           16 tools, auto-discovered                    
+  Tool registration                   Manual TOOL_DEFINITIONS list (hardcoded JSON) Auto-discovery via pkgutil + schema auto-generated from Tool properties
+  Workflow                            Hardcoded 6-step pipeline in system prompt    LLM decides every turn — no step iteration   
+  Planning                            System prompt IS the plan (fixed sequence)    Plan is a TOOL (update_plan) — LLM scratchpad, never enforced by code
+  Reflection                          None                                          Reflector injects advisory _agent_notes into tool results
+  Memory                              Single flat conversation[] list               3-tier: Episodic (windowed) + Semantic facts + Plan scratchpad
+  Error handling                      try/except per tool, no retry                 Executor with configurable retry + exponential backoff
+  State management                    Global dict: agent_state = {}                 Typed AgentState dataclass with .reset()     
+  Config                              Hardcoded API keys at module level            Frozen AgentConfig dataclass + env var fallback
+  Extensibility                       Edit TOOL_DEFINITIONS + add handler function  Drop a .py file in tools/ — auto-discovered on restart
+  Who decides next action?            Python code (implicit pipeline + system prompt order) The LLM — every single turn                  
+  Can skip/reorder steps?             No                                            Yes, LLM decides freely                      
+  Can do something unplanned?         No                                            Yes, LLM has full autonomy                   
+  System prompt                       Prescribes 'Step 0 → Step 1 → ... → Step 5'   Describes capabilities + behavioral guidelines, NO step order
+  Anomaly detection                   None — agent blindly accepts 100% pass rates  Reflector flags: 100% TOD, all-effective TOE, 0 dedup pairs, low CA match
+
+================================================================================
+  16. UNIQUE CAPABILITIES OF THE NEW AUTONOMOUS AGENT
+================================================================================
+
+
+   1. TRUE AUTONOMY
+      The LLM decides what to do at every turn. No hardcoded workflow.
+  Ask 'just check for duplicates' → it loads RCM, runs dedup, shows results. DONE.
+  Ask 'full audit' → it creates a plan, works through it, asks for input as needed.
+  The same agent handles both. No mode switching. No pipeline enforcement.
+
+   2. DYNAMIC PLANNING (update_plan tool)
+      The agent writes its own plan as a markdown scratchpad.
+  The plan is shown in every LLM context but never enforced by code.
+  Agent can follow it, revise it, or completely deviate.
+  Mid-course changes: 'actually skip the dedup' → agent updates plan and moves on.
+
+   3. ANOMALY DETECTION (Reflector)
+      Advisory notes are injected into tool results via _agent_notes.
+  Catches: 100% TOD pass rates, zero TOE deviations, zero dedup pairs in large RCMs,
+           very few or too many AI suggestions, <50% control assessment match.
+  The LLM sees these notes and decides what to do — flag to user, re-examine, continue.
+
+   4. 3-TIER MEMORY
+      Episodic: Full conversation messages, windowed to last 40.
+  Semantic: Auto-extracted key facts that survive context truncation.
+    Example: 'RCM loaded: 28 rows, 15 columns' persists even after window slides.
+  Plan scratchpad: The agent's working plan, always visible in context.
+
+   5. TOOL AUTO-DISCOVERY
+      Drop a .py file in agent/tools/ with a Tool subclass → it's registered on restart.
+  No manual JSON schema editing. No handler mapping. Schema auto-generated.
+  Example: add custom_analysis.py with class CustomTool(Tool) → available to LLM.
+
+   6. EXECUTE_PYTHON SANDBOX
+      The LLM can write and execute arbitrary Python code.
+  Pre-loaded: df (current RCM), pd, np, os, json, math, datetime.
+  If the code reassigns 'df', the RCM is automatically updated.
+  Assign to 'result' to return structured data to the LLM.
+
+   7. WEB SEARCH
+      DuckDuckGo Instant Answer API + LLM knowledge fallback.
+  The agent can look up SOX regulations, PCAOB standards, COSO framework on the fly.
+  No pre-loaded knowledge required — real-time information retrieval.
+
+   8. INSPECT_DATAFRAME (8 modes)
+      info: shape, dtypes, nulls, memory usage
+  head/tail: first/last N rows
+  describe: full statistics
+  columns: all columns with dtype, non-null count, unique count
+  value_counts: unique values for any column
+  sample: random N rows
+  query: filter with pandas query syntax (e.g. 'Process == "P2P"')
+
+   9. CONDITIONAL UPDATES (modify_rcm)
+      update_values supports condition_column + condition_value.
+  Example: 'Set risk_level to Critical where Process is P2P'
+  Also: add_column, rename_column — full structural RCM editing.
+
+  10. TYPED, MODULAR ARCHITECTURE
+      20 files across 4 packages. Every component is independently testable.
+  AgentState dataclass (not a global dict), frozen AgentConfig,
+  abstract Tool base class, typed ToolResult, ToolParameter.
+  Logging throughout. Clean error propagation.
+
+  11. RETRY WITH BACKOFF
+      Executor retries transient errors (ConnectionError, TimeoutError)
+  with configurable max_retries and exponential backoff.
+  Permanent errors (ValueError, TypeError, KeyError, FileNotFoundError) fail fast.
+
+  12. COLORED TERMINAL REPL
+      ANSI-colored output: cyan for agent speech, green for tool calls,
+  red for errors. /new to reset, /state to inspect session, /quit to exit.
+  Clean separation of UI (callbacks) from agent logic.
+
+================================================================================
+  FINAL SUMMARY
+================================================================================
+
+  Total checks: 181
+  Passed:       178
+  Failed:       3
+  Duration:     1.24s
+  Result:       3 TESTS FAILED

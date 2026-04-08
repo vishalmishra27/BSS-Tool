@@ -1,0 +1,15 @@
+trigger: "Filter data, show only rows matching a condition, view subset of data, search for specific rows"
+title: "Filter View (Read-Only)"
+steps:
+  - "Use modify_rcm(action='filter_view', query_expr='`Control Type` == \"Manual\"')"
+  - "This is READ-ONLY — it shows matching rows WITHOUT modifying the DataFrame"
+  - "For multiple conditions: query_expr='`Risk Rating` == \"High\" & `Control Type` == \"Manual\"'"
+notes:
+  - "Use backticks for column names with spaces in query_expr"
+  - "Supports pandas query syntax: ==, !=, >, <, .str.contains(), &, |"
+  - "Returns up to 200 matching rows"
+  - "If you need to MODIFY filtered rows, use update_values or bulk_update with condition_column instead"
+tags:
+  - filter
+  - view
+  - query

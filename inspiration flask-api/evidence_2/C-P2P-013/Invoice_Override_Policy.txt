@@ -1,0 +1,26 @@
+ACCOUNTS PAYABLE — INVOICE OVERRIDE POLICY
+Version: 1.0 | Effective: March 2023 | Owner: AP Manager
+
+1. PURPOSE
+   Defines the process for overriding three-way match blocks on invoices.
+
+2. OVERRIDE APPROVAL REQUIREMENTS
+   2.1 Variance up to 5%:
+       - AP Clerk may override with documented reason
+       - AP Supervisor must review within 2 business days
+   2.2 Variance 5% to 10%:
+       - AP Supervisor approval REQUIRED before override
+   2.3 Variance above 10%:
+       - AP Manager approval REQUIRED before override
+       - Procurement Manager must be notified
+
+3. DOCUMENTATION
+   - Override reason must be entered in SAP
+   - Supporting documentation (vendor communication, price change notice) must be attached
+
+4. MONITORING
+   - AP Manager reviews all overrides monthly
+   - Overrides above $10,000 escalated to Finance Controller
+
+NOTE: This policy is NOT currently enforced by SAP workflow. Enforcement is manual.
+      IT enhancement request submitted (CR-2024-0156) to add approval workflow — pending.

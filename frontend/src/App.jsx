@@ -245,7 +245,7 @@ function AppLayout({ onLogout }) {
           <Route path="/flowchart"         element={<Flowchart />} />
           <Route path="/lob/:lob"          element={<TransformationLOBPage />} />
           <Route path="/testcase/:id"      element={<TestcaseDetailPage />} />
-          <Route path="/agent"                 element={<AgentChatPage />} />
+          <Route path="/agent"                 element={<OcrAgentPage />} />
           <Route path="/agent/about"            element={<AgentDescriptionsPage />} />
           <Route path="/agent/data"           element={<DataManagementAgentPage />} />
           <Route path="/agent/crud"          element={<CrudAgentPage />} />

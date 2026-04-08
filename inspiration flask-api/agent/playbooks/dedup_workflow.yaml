@@ -1,0 +1,16 @@
+trigger: "Find duplicate rows, check for duplicates, deduplicate the RCM, remove duplicate controls or risks"
+title: "Deduplication Workflow"
+steps:
+  - "Run run_deduplication() on the loaded RCM"
+  - "Review the duplicate pairs shown to the user"
+  - "Ask user which pairs to remove"
+  - "Execute: remove_duplicates(removals=[{pair: 1, remove: 'b'}, {pair: 2, remove: 'both'}])"
+  - "remove='a' removes row A (keeps B), remove='b' removes row B (keeps A), remove='both' removes both"
+notes:
+  - "ALWAYS show the pairs to the user before removing — never auto-decide which to keep"
+  - "This uses semantic similarity — both exact matches and near-matches are caught"
+  - "Pair numbers are 1-based (first pair is pair: 1)"
+tags:
+  - dedup
+  - duplicates
+  - cleanup

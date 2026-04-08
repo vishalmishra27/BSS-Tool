@@ -1,0 +1,11 @@
+Sample ID: S1
+Source Document: PAY-2024-W21 / Payment Gateway Rejection Log / Alert Screenshot
+Test Date: 2024-06-22
+Tested By: Auditor - Priya Nair
+
+Payment $6,525 to Reliable Components (V-10190). Gateway cross-referenced vendor DB — match.
+Bank details matched verified master. Payment cleared and included in PAY-2024-W21.
+Tested unregistered "Phantom Supplies Ltd." — gateway rejected immediately.
+Rejection logged. Automated alert sent to Treasury and Compliance.
+Real-time cross-reference cannot be bypassed at gateway level.
+Vendor must be in master file first (requires due diligence per C-P2P-004/006).

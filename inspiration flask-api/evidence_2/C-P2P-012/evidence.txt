@@ -1,0 +1,11 @@
+Sample ID: S1
+Source Document: GR-44601 / PO-89055 / GR-DISC-0523 / Photos
+Test Date: 2024-06-17
+Tested By: Auditor - Sanjay Kulkarni
+
+Delivery for PO-89055 (150 units Part #BN-220) received 2024-05-24.
+Physical count: 148 units (2 short). Visual inspection: 3 units damaged.
+Variance form GR-DISC-0523 completed — short shipment and damage documented with photos.
+Form routed to Procurement via email. Procurement initiated vendor claim.
+GR-44601 entered for 145 accepted units (150 - 2 short - 3 damaged).
+Supervisor Manoj Singh reviewed and confirmed the partial GR.

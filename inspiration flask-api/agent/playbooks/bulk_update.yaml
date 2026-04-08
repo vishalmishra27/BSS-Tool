@@ -1,0 +1,15 @@
+trigger: "Update multiple columns at once, change several values simultaneously, bulk modify multiple fields"
+title: "Bulk Column Update"
+steps:
+  - "Use modify_rcm(action='bulk_update', updates={'Column1': 'value1', 'Column2': 'value2'}, condition_column='FilterCol', condition_value='FilterVal')"
+  - "Example: modify_rcm(action='bulk_update', updates={'Status': 'Reviewed', 'Reviewer': 'Auditor1'}, condition_column='Process', condition_value='Financial Reporting')"
+  - "Verify changes with inspect_dataframe(mode='head')"
+  - "Save with save_excel(step_name='bulk_update')"
+notes:
+  - "All column names in the updates dict must already exist in the DataFrame"
+  - "Without condition_column, updates ALL rows"
+  - "Use inspect_dataframe(mode='info') first to see all available column names"
+tags:
+  - modify
+  - bulk
+  - update

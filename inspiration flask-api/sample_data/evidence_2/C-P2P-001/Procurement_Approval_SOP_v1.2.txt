@@ -1,0 +1,30 @@
+PROCUREMENT APPROVAL STANDARD OPERATING PROCEDURE
+Version: 1.2 | Effective Date: 2023-09-01 | Owner: Procurement Manager
+
+1. PURPOSE
+   Defines the approval workflow for all Purchase Requisitions (PRs).
+
+2. SCOPE
+   Applies to all departments submitting PRs through SAP.
+
+3. APPROVAL MATRIX
+   3.1 PRs below $5,000:
+       - Department Head approval required (single level)
+   3.2 PRs $5,000 and above:
+       - Department Head approval (Level 1)
+       - Finance Manager approval (Level 2)
+   3.3 PRs above $50,000:
+       - Department Head + Finance Manager + CFO approval (three levels)
+
+4. PROCESS FLOW
+   Requestor submits PR in SAP → System routes to Department Head →
+   If above threshold, routes to Finance Manager → Upon all approvals,
+   PR status changes to "Approved" → Procurement team converts to PO.
+
+5. EXCEPTIONS
+   Emergency purchases may bypass workflow with CFO email approval.
+   Must be documented retroactively within 48 hours.
+
+6. REVIEW
+   This SOP is reviewed annually by the Procurement Manager.
+   Last review: September 2023. Next review: September 2024.

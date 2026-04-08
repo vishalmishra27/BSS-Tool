@@ -1,0 +1,325 @@
+================================================================================
+AZURE BLOB STORAGE INTEGRATION — CHANGE LOG & REFERENCE
+================================================================================
+Date: March 2026
+Scope: /Users/rishi/Downloads/16MM/ControlXAI/flask-api/
+
+================================================================================
+WHAT WAS DONE
+================================================================================
+
+The entire flask-api agent was updated to use Azure Blob Storage for file
+uploads, evidence folders, and generated artifacts — instead of relying
+solely on local filesystem storage. Cosmos DB was already in use for chat
+metadata and agent memory; that integration was also audited and hardened.
+
+The design principle: files are uploaded to BOTH local cache AND blob storage.
+When tools need to read files, blob paths are transparently resolved to a
+local temp cache (because pandas/engines need real filesystem paths). When
+tools produce output, artifacts are uploaded to blob after local save.
+
+If blob storage is unavailable, everything gracefully falls back to local-only
+storage with no crashes.
+
+================================================================================
+NEW FILES CREATED
+================================================================================
+
+1. server/blob_store.py
+   - Central Azure Blob Storage service (singleton, matches CosmosStore design)
+   - Upload/download/list/delete operations
+   - Local temp cache at /tmp/sox_blob_cache/ for engines needing filesystem paths
+   - Path detection: uploads/, evidence/, artifacts/ prefixes = blob paths
+   - All methods best-effort (log warnings, never raise)
+   - Key functions:
+     * get_blob_store() — module-level singleton
+     * BlobStore.upload_file(), upload_bytes(), upload_directory()
+     * BlobStore.download_to_temp(), download_bytes(), download_directory()
+     * BlobStore.ensure_local(path) — blob path -> local cache; local path -> as-is
+     * BlobStore.ensure_local_directory(path) — same for folders
+     * BlobStore.is_blob_path(path) — static check for blob path prefixes
+     * BlobStore.list_blobs(prefix, delimiter)
+
+================================================================================
+MODIFIED FILES — UPLOAD/DOWNLOAD ROUTES
+================================================================================
+
+2. server/routes/upload.py
+   CHANGES:
+   - POST /api/upload: now uploads to blob AND local cache, returns both paths
+     * Response adds: blob_path, blob_url fields
+   - POST /api/upload-folder: uploads evidence folder to blob AND local cache
+     * Tracks blob_upload_failures count
+     * Response adds: blob_path, blob_upload_failures fields
+   - GET /api/download: tries blob first for blob paths, falls back to local
+     * Supports streaming from blob via StreamingResponse
+     * Path traversal fix: uses Path.resolve() for symlink safety
+     * Can search blob storage if local file not found
+
+================================================================================
+MODIFIED FILES — AGENT TOOLS
+================================================================================
+
+3. agent/tools/filesystem.py (list_directory, read_file)
+   CHANGES:
+   - list_directory: detects blob paths, lists from blob storage with hierarchy
+   - read_file: downloads blob to temp cache before reading
+   - Helper functions: _get_blob_store(), _is_blob_path()
+
+4. agent/tools/rcm_loader.py (load_rcm)
+   CHANGES:
+   - Downloads blob-stored RCM files to temp cache before processing
+   - Uploads normalised_rcm.xlsx to blob after generation
+   - Response adds: normalised_rcm_blob_path field
+   - Helper functions: _get_blob_store(), _is_blob_path(), _upload_artifact()
+
+5. agent/tools/checkpoint.py (save_excel)
+   CHANGES:
+   - Uploads checkpoint Excel to blob after local save
+   - Response adds: blob_path field
+   - Helper function: _upload_artifact()
+
+6. agent/tools/test_of_design.py (run_test_of_design)
+   CHANGES:
+   - Resolves blob evidence folder paths to local cache before engine runs
+   - Uploads 4_TOD_Results.xlsx workpaper to blob after export
+   - Response adds: output_blob_path field
+   - Helper functions: _resolve_evidence_folder(), _upload_artifact()
+
+7. agent/tools/test_of_effectiveness.py (run_test_of_effectiveness)
+   CHANGES:
+   - Resolves blob evidence folder paths to local cache before engine runs
+   - Uploads 5_TOE_Workpaper.xlsx to blob after export
+   - Response adds: output_blob_path field
+   - Helper functions: _resolve_evidence_folder(), _upload_artifact()
+
+8. agent/tools/preview_tod_attributes.py
+   CHANGES:
+   - Resolves blob evidence folder paths before scanning control dirs
+   - Helper function: _resolve_evidence_folder()
+
+9. agent/tools/preview_toe_attributes.py
+   CHANGES:
+   - Resolves blob evidence folder paths before scanning control dirs
+   - Helper function: _resolve_evidence_folder()
+
+10. agent/tools/sox_scoping_engine.py
+    CHANGES:
+    - Resolves blob paths for trial_balance_path, sop_paths, override_excel_path
+    - All 4 export helpers upload to blob after local save:
+      * _export_qualitative_to_excel()
+      * _export_scoping_to_excel()
+      * _export_phase_to_excel()
+      * _export_accounts_to_excel()
+    - Helper functions: _resolve_blob_file(), _resolve_blob_directory(), _upload_artifact()
+
+11. agent/tools/quality_comparison.py
+    CHANGES:
+    - Resolves blob project_folder path to local cache before running
+
+12. agent/tools/remove_failed_controls.py
+    CHANGES:
+    - Uploads TOD_Failed_Controls_Removed.xlsx to blob after saving
+
+================================================================================
+MODIFIED FILES — SERVER INFRASTRUCTURE
+================================================================================
+
+13. server/app.py
+    CHANGES:
+    - Initializes BlobStore singleton at startup (after .env loaded, before graph)
+    - Stores blob_store on app.state
+    - Health endpoint returns blob_storage: "available" / "unavailable"
+
+14. server/tool_adapter.py
+    CHANGES:
+    - TOD slim result includes output_blob_path
+    - TOE slim result includes output_blob_path
+
+15. server/cosmos_store.py
+    BUG FIX:
+    - Added self._agent_memory = None and self._context_cache = None as defaults
+      BEFORE the try block in __init__, preventing AttributeError if Cosmos
+      initialization partially fails
+
+16. server/routes/messages.py
+    CHANGES:
+    - Fixed misleading comment in session-results endpoint (said "Context-cache
+      first" but code correctly calls restore_agent_memory)
+
+17. requirements.txt
+    CHANGES:
+    - Added: azure-storage-blob>=12.19.0
+
+================================================================================
+TOOLS THAT WERE VERIFIED AND DO NOT NEED BLOB CHANGES
+================================================================================
+
+- agent/tools/ai_suggest.py — writes temp files for engine, results in memory
+- agent/tools/control_assessment.py — same pattern, results in state cache
+- agent/tools/deduplication.py — same pattern, results in state cache
+- agent/tools/sampling_engine.py — operates on in-memory DataFrame only
+- agent/tools/python_exec.py — executes user code, no file persistence
+- agent/tools/web_search.py — external API, no files
+- agent/tools/modify_attributes.py — modifies in-memory schemas only
+- agent/tools/rcm_mutator.py — modifies in-memory DataFrame only
+- agent/tools/column_normalizer.py — modifies in-memory DataFrame only
+
+These tools store results in state.*_cache -> Cosmos Agent-memory. Their
+output_dir files are workspace intermediaries saved via save_excel when needed.
+
+================================================================================
+ENGINE FILES — NOT MODIFIED
+================================================================================
+
+The following core engine files were NOT touched:
+- engines/TOD_Engine.py
+- engines/TOE_Engine.py
+- engines/config.py
+- engines/rcm_reader.py
+- engines/AiSuggest.py (or similar)
+- engines/ControlAssesment.py
+- engines/DeDupli.py
+- sox_package 2/sox_scoping_engine.py
+
+All engine invocation code (constructors, method calls, parameters) in the
+tool wrappers is IDENTICAL to before. Blob operations sit ONLY at the I/O
+boundary: resolve paths BEFORE engine runs, upload artifacts AFTER engine saves.
+
+================================================================================
+BLOB PATH CONVENTIONS
+================================================================================
+
+Blob paths in the Azure container (fileupload-aashu):
+
+  uploads/{session_id}/{filename}           — user-uploaded files (RCM, etc.)
+  evidence/{session_id}/{timestamp}/{...}   — evidence folder trees
+  artifacts/{output_dir_name}/{filename}    — engine-generated output (Excel, PDF)
+
+A path is detected as a blob path if it is RELATIVE and starts with:
+  uploads/, evidence/, artifacts/, or blob://
+Absolute paths (starting with / or drive letter) are always treated as local.
+This is enforced by BlobStore.is_blob_path() which checks os.path.isabs() first.
+
+================================================================================
+ENV VARIABLES USED
+================================================================================
+
+In flask-api/.env:
+
+  AZURE_STORAGE_CONNECTION_STRING=DefaultEndpointsProtocol=https;AccountName=...
+  AZURE_STORAGE_CONTAINER_NAME=fileupload-aashu
+
+  COSMOS_ENDPOINT=https://grcsxyz.documents.azure.com:443/
+  COSMOS_KEY=...
+  COSMOS_DATABASE=2116824
+
+Cosmos containers (must exist in Azure Portal):
+  Sessions          (partition key /projectId)  — chat metadata
+  Agent-memory      (partition key /sessionId)  — durable tool results
+  Context-cache     (partition key /sessionId)  — fast TTL cache (3600s)
+
+================================================================================
+BUGS FOUND AND FIXED DURING AUDITS
+================================================================================
+
+Round 1 (initial implementation review):
+  1. CRITICAL: test_of_design.py and test_of_effectiveness.py had nonsensical
+     `if 'tod_blob_path' in dir()` checks. Fixed: use variable directly.
+  2. MEDIUM: All _upload_artifact() helpers had session_id hardcoded to "default".
+     Fixed: derive from state.output_dir basename for proper isolation.
+  3. MEDIUM: _get_blob_store() and _is_blob_path() caught bare Exception.
+     Fixed: catch ImportError specifically, log others.
+
+Round 2 (deep agent flow audit):
+  4. HIGH: CosmosStore.__init__ didn't set _agent_memory/_context_cache to None
+     before try block. If init partially failed -> AttributeError on first use.
+     Fixed: set both to None at top of __init__.
+  5. HIGH: Download endpoint path traversal via symlink. Used str.startswith()
+     which isn't symlink-safe. Fixed: use Path.resolve() on both paths.
+  6. MEDIUM: Folder upload silently ignored partial blob failures.
+     Fixed: track blob_upload_failures count, include in response.
+  7. MEDIUM: tool_adapter.py slim results for TOD/TOE didn't include
+     output_blob_path. Fixed: added to both slim dicts.
+  8. LOW: Misleading comment in messages.py session-results endpoint.
+     Fixed: corrected comment.
+
+================================================================================
+KNOWN LIMITATIONS
+================================================================================
+
+1. Storage account key in .env may need refreshing — auth errors were seen
+   during local testing. The code handles this gracefully (falls back to
+   local-only storage).
+
+2. Blob temp cache (/tmp/sox_blob_cache/) is never cleaned up automatically.
+   Downloaded blobs persist until OS cleans /tmp. For production, consider
+   adding a TTL cleanup task.
+
+3. Pre-existing: filesystem.py uses PyPDF2 for PDF reading but requirements.txt
+   has pdfplumber instead. Not introduced by blob changes. Gracefully handled
+   (returns error message if PyPDF2 missing).
+
+4. RuntimeStateManager holds a lock during Cosmos I/O when creating new sessions.
+   Pre-existing design. Only matters at high concurrency (>10 simultaneous new
+   sessions).
+
+================================================================================
+HOW TO VERIFY EVERYTHING WORKS
+================================================================================
+
+1. Start the server:
+   cd flask-api && python run_server.py
+
+2. Check health:
+   curl http://localhost:8000/api/health
+   → Should show blob_storage: "available" (or "unavailable" if key expired)
+
+3. Upload a file:
+   curl -X POST http://localhost:8000/api/upload -F file=@test.xlsx
+   → Response should include both path (local) and blob_path
+
+4. Upload evidence folder:
+   → Response should include folder_path, blob_path, blob_upload_failures
+
+5. Run TOD/TOE through the chat UI:
+   → Check logs for "uploaded to blob" messages
+   → output_blob_path should appear in tool results
+
+6. Download artifact:
+   curl http://localhost:8000/api/download?path=artifacts/session/file.xlsx
+   → Should stream from blob if it's a blob path
+
+================================================================================
+IF SOMETHING BREAKS — QUICK REFERENCE
+================================================================================
+
+Problem: Server won't start
+  → Check AZURE_STORAGE_CONNECTION_STRING in .env
+  → BlobStore init is non-fatal; check logs for "BlobStore init failed"
+  → Cosmos init is also non-fatal; check "CosmosStore init failed"
+
+Problem: Files not uploading to blob
+  → Check blob_store.available (health endpoint)
+  → Check storage account key hasn't been rotated
+  → Local storage still works as fallback
+
+Problem: Tools can't read blob-stored files
+  → Check /tmp/sox_blob_cache/ for downloaded files
+  → Check logs for "BlobStore.download_to_file failed"
+  → Tool should fall back to local path if blob fails
+
+Problem: Artifacts not appearing in blob
+  → Check logs for "_upload_artifact" warnings
+  → Verify output_dir exists and has files
+  → Artifacts still saved locally regardless
+
+Problem: Cosmos Agent-memory not persisting
+  → Check COSMOS_ENDPOINT, COSMOS_KEY, COSMOS_DATABASE in .env
+  → Verify containers exist in Azure Portal: Agent-memory, Context-cache
+  → Check logs for "CosmosStore" errors
+
+To completely disable blob storage (emergency):
+  → Set AZURE_STORAGE_CONNECTION_STRING="" in .env
+  → Everything falls back to local-only storage
+  → No code changes needed

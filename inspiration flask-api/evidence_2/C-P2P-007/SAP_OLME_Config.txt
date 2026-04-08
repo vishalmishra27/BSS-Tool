@@ -1,0 +1,17 @@
+SAP CONFIGURATION — OLME: PO-PR Linkage
+Export Date: 2024-06-14 | Exported By: Raj Kumar (IT)
+
+Path: SPRO > Materials Management > Purchasing > Purchase Order > OLME Settings
+
+Parameter: PO_REQUIRES_PR_REFERENCE
+  Value: MANDATORY
+  Description: Every Purchase Order must reference a valid, approved Purchase Requisition
+  Override: NOT ALLOWED at user level
+  Change Control: Requires IT Change Request (CR) with business justification
+
+Parameter: PR_STATUS_FOR_PO
+  Value: APPROVED_ONLY
+  Description: Only PRs with status "Approved" can be referenced by a PO
+
+Last Configuration Change: 2022-11-15 (CR-2022-0847)
+Changed By: IT Admin — Sunil Patel

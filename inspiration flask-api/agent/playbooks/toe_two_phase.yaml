@@ -1,0 +1,15 @@
+trigger: "Run TOE, test of effectiveness, test operating effectiveness, evaluate controls, TOE testing"
+title: "Two-Phase TOE (Preview Attributes → Approve → Run)"
+steps:
+  - "1. Ask the user for the TOE evidence folder path (this is SEPARATE from the TOD evidence folder)"
+  - "2. Run preview_toe_attributes(evidence_folder='<path>') to generate testing attributes"
+  - "3. A popup appears in the UI for the user to review and edit the attributes — wait for user approval"
+  - "4. After the user approves, run run_test_of_effectiveness(evidence_folder='<path>') — it uses the approved schemas automatically"
+  - "5. The pre-approved attributes are cached in state and used in Phase 2 (no regeneration)"
+notes:
+  - "NEVER skip the preview_toe_attributes step — always let the user review attributes first"
+  - "The evidence_folder for TOE must be DIFFERENT from the TOD evidence folder — ask independently"
+  - "Run sampling (run_sampling_engine) before TOE so count_of_samples is populated"
+  - "If the user hasn't run sampling yet, suggest running it before proceeding with TOE"
+  - "TOD uses only 1 sample per control; TOE uses multiple samples (determined by sampling)"
+  - "The correct order is: TOD → Sampling → TOE (preview → approve → run)"

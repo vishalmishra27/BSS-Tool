@@ -1,0 +1,573 @@
+================================================================================
+  RAG HANDBOOK ENGINE — INTEGRATION GUIDE
+  For Backend & Frontend Teams
+================================================================================
+
+LAST UPDATED: 2026-03-23
+AUTHOR: Auto-generated
+
+TABLE OF CONTENTS
+-----------------
+1. Overview
+2. Architecture
+3. Files Added / Modified
+4. Cosmos DB Setup (Backend Team)
+5. How Ingestion Works
+6. How Querying Works
+7. Frontend Integration
+8. SSE Events for RAG Tools
+9. Tool Adapter — Slimming (Optional)
+10. API Endpoints (If Needed)
+11. Configuration
+12. Testing Checklist
+13. Troubleshooting
+
+
+================================================================================
+1. OVERVIEW
+================================================================================
+
+The RAG (Retrieval-Augmented Generation) engine allows users to index large
+reference documents (e.g., a 474-page ICOFAR handbook) and ask questions
+from them within the existing SOX audit agent chat.
+
+Key behavior:
+  - User says "Index this handbook" → agent calls index_handbook tool
+  - User asks a question about the handbook → agent calls ask_handbook tool
+  - User asks a general question → agent answers directly (no RAG)
+
+The LLM decides which path to take based on tool descriptions and the
+system prompt — no separate routing logic needed.
+
+Persistence:
+  - Indexed documents are stored in the EXISTING Cosmos DB "Embeddings"
+    container — the same one already used by the embeddings API.
+  - Chunks persist across sessions. Index once, query forever.
+  - Each chunk is tagged with metadata.type = "rag_chunk" to distinguish
+    it from other embeddings (e.g., evidence validator embeddings).
+
+
+================================================================================
+2. ARCHITECTURE
+================================================================================
+
+                    ┌──────────────────────┐
+                    │  User in Chat UI     │
+                    └──────────┬───────────┘
+                               │
+                    POST /api/chats/{id}/messages
+                               │
+                    ┌──────────▼───────────┐
+                    │  LangGraph Agent     │
+                    │  (28 tools total)    │
+                    │                      │
+                    │  LLM decides:        │
+                    │  • index_handbook    │──── one-time ingestion
+                    │  • ask_handbook      │──── per-question RAG
+                    │  • other 26 tools    │──── existing SOX workflow
+                    │  • direct answer     │──── general knowledge
+                    └──────────┬───────────┘
+                               │
+                    ┌──────────▼───────────┐
+                    │  engines/RAGEngine   │
+                    │                      │
+                    │  Ingest:             │
+                    │  PDF → parse →       │
+                    │  chunk → embed →     │
+                    │  Cosmos DB           │
+                    │                      │
+                    │  Query:              │
+                    │  question → embed →  │
+                    │  vector search →     │
+                    │  GPT answer          │
+                    └──────────┬───────────┘
+                               │
+              ┌────────────────┼────────────────┐
+              │                │                │
+    ┌─────────▼──────┐ ┌──────▼───────┐ ┌──────▼──────┐
+    │ Document       │ │ Azure OpenAI │ │ Cosmos DB   │
+    │ Intelligence   │ │ Embeddings   │ │ Embeddings  │
+    │ (PDF parsing)  │ │ (ada-002)    │ │ Container   │
+    └────────────────┘ └──────────────┘ └─────────────┘
+
+
+================================================================================
+3. FILES ADDED / MODIFIED
+================================================================================
+
+NEW FILES:
+  engines/RAGEngine.py          — Core engine (ingest + query + delete)
+  agent/tools/rag_query.py      — Agent tools (index_handbook, ask_handbook)
+
+MODIFIED FILES:
+  agent/types.py                — Added 3 fields to AgentState:
+                                    rag_project_id: str
+                                    rag_document_name: str
+                                    rag_chunk_count: int
+  agent/prompts/system.py       — Added RAG routing guidance + state display
+
+
+================================================================================
+4. COSMOS DB SETUP (BACKEND TEAM)
+================================================================================
+
+*** NO NEW CONTAINERS NEEDED ***
+
+The RAG engine uses the EXISTING "Embeddings" container that is already
+created at startup in server/cosmos_store.py.
+
+Container details:
+  Name:           Embeddings
+  Partition key:  /projectId
+  Vector index:   /embedding (1536-dim float32, cosine distance, quantizedFlat)
+
+The RAG chunks are stored as regular embedding documents with extra metadata:
+
+  {
+    "id": "uuid",
+    "projectId": "<project-id or 'default-rag'>",
+    "text": "chunk text content...",
+    "embedding": [0.123, -0.456, ...],       // 1536 floats
+    "source": "rag:ICOFAR_Handbook.pdf",
+    "metadata": {
+      "type": "rag_chunk",                   // <-- KEY: distinguishes from other embeddings
+      "document_name": "ICOFAR_Handbook.pdf",
+      "source_hash": "md5-of-file",          // dedup: prevents re-indexing same file
+      "chunk_index": 42,
+      "page": 127,
+      "section_type": "paragraph"
+    },
+    "createdAt": "2026-03-23T10:00:00Z"
+  }
+
+IMPORTANT for backend team:
+  - The "type": "rag_chunk" in metadata is what separates RAG data from
+    other embeddings. All queries filter on this.
+  - The "source_hash" field (MD5 of file bytes) prevents duplicate indexing.
+    If the user tries to index the same file again, it skips unless
+    force_reindex=True.
+  - The "projectId" partition key controls data isolation. Different projects
+    can have different handbooks indexed.
+
+CAPACITY PLANNING:
+  - A 474-page PDF produces ~1500-2000 chunks
+  - Each chunk document is ~2-3 KB (text) + ~6 KB (1536 floats) ≈ 8-9 KB
+  - Total for one handbook: ~12-18 MB in Cosmos
+  - Vector search performance: sub-second with quantizedFlat index
+  - RU consumption: ~5-10 RU per vector search query
+
+
+================================================================================
+5. HOW INGESTION WORKS
+================================================================================
+
+When the user says "Index this ICOFAR handbook at /path/to/file.pdf":
+
+  1. Agent calls index_handbook(file_path="/path/to/file.pdf")
+
+  2. RAGEngine.ingest() runs:
+
+     a) FILE HASH CHECK
+        - Computes MD5 of the file
+        - Queries Cosmos for any chunk with matching source_hash
+        - If found and force_reindex=False → returns "Already indexed"
+
+     b) PARSE DOCUMENT
+        - Uses Document_Intelligence.parse_document() (existing library)
+        - Supports: PDF, DOCX, XLSX, PPTX, images, EML, etc.
+        - Returns: ParsedDocument with full_text + typed Section objects
+        - For PDFs: pdfplumber for native text, Azure Document Intelligence
+          OCR for scanned pages
+
+     c) CHUNK
+        - Section-aware chunking: uses Section boundaries as natural breaks
+        - Target: 512 tokens per chunk, 100 token overlap
+        - Preserves page numbers from Section.page
+        - Fallback: sliding window if sections are not available
+        - Result: ~1500-2000 Chunk objects for 474 pages
+
+     d) EMBED
+        - Batch-embeds all chunks using Azure OpenAI text-embedding-ada-002
+        - Batch size: 16 (Azure API limit)
+        - Texts truncated to 8000 chars max per chunk
+        - Result: 1536-dim float32 vectors
+
+     e) STORE IN COSMOS
+        - Each chunk stored as an Embeddings document via
+          CosmosStore.save_embedding()
+        - Tagged with metadata.type = "rag_chunk"
+        - Uses projectId as partition key
+
+  3. Tool returns result to agent:
+     {
+       "document_name": "ICOFAR_Handbook.pdf",
+       "total_pages": 474,
+       "total_chunks": 1847,
+       "chunks_stored": 1847,
+       "already_indexed": false,
+       "duration_seconds": 180.5
+     }
+
+  4. AgentState updated:
+     state.rag_project_id = "default-rag"
+     state.rag_document_name = "ICOFAR_Handbook.pdf"
+     state.rag_chunk_count = 1847
+
+  5. System prompt now shows:
+     "Handbook indexed: ICOFAR_Handbook.pdf, 1847 chunks (use ask_handbook to query)"
+
+TIMING:
+  - 474 pages ≈ 2-4 minutes (parsing + embedding are the bottlenecks)
+  - Progress is visible via tool_start/tool_end SSE events
+
+
+================================================================================
+6. HOW QUERYING WORKS
+================================================================================
+
+When the user asks "What does the handbook say about control testing?":
+
+  1. LLM sees the system prompt with:
+     - "Handbook indexed: ICOFAR_Handbook.pdf, 1847 chunks"
+     - RAG routing rules telling it to use ask_handbook for doc questions
+
+  2. LLM calls ask_handbook(question="What does the handbook say about control testing?")
+
+  3. Precondition check:
+     - Verifies state.rag_project_id exists
+     - If not → returns error "No handbook indexed yet"
+
+  4. RAGEngine.query() runs:
+
+     a) EMBED QUESTION
+        - Embeds the question using ada-002 → 1536-dim vector
+
+     b) VECTOR SEARCH
+        - Calls CosmosStore.vector_search() with:
+          project_id = state.rag_project_id
+          query_vector = question embedding
+          top_k = 10 (default, configurable)
+        - Cosmos returns top-k documents sorted by cosine similarity
+        - Filters results to metadata.type == "rag_chunk" only
+
+     c) BUILD CONTEXT
+        - Takes top-k chunk texts, annotated with page numbers
+        - Concatenates up to 12,000 chars of context
+        - Format per chunk: "---[Page 127]\nchunk text here\n"
+
+     d) GENERATE ANSWER
+        - Sends to GPT-5.2:
+          System: "Answer ONLY from provided excerpts. Cite page numbers.
+                   Say 'not found' if handbook doesn't cover it."
+          User:   context chunks + question
+        - Temperature: 0.3 (factual, low creativity)
+        - Max tokens: 1500
+
+  5. Tool returns to agent:
+     {
+       "answer": "According to the ICOFAR Handbook (Pages 127-131)...",
+       "sources": [
+         {"snippet": "Control testing requires...", "page": 127, "similarity": 0.892},
+         {"snippet": "The auditor must verify...", "page": 128, "similarity": 0.856},
+         ...
+       ],
+       "chunks_retrieved": 10,
+       "document_name": "ICOFAR_Handbook.pdf",
+       "duration_seconds": 3.2
+     }
+
+  6. Agent presents the answer to the user with citations.
+
+TIMING:
+  - Embedding: ~200ms
+  - Vector search: ~100-300ms
+  - LLM generation: ~2-4s
+  - Total: ~3-5 seconds per question
+
+
+================================================================================
+7. FRONTEND INTEGRATION
+================================================================================
+
+*** MINIMAL FRONTEND CHANGES NEEDED ***
+
+The RAG tools work exactly like every other agent tool. They:
+  - Stream via the same SSE endpoint (POST /api/chats/{id}/messages)
+  - Return results in the same tool_end event format
+  - Show up in chat as regular agent responses
+
+WHAT THE FRONTEND ALREADY HANDLES (no changes needed):
+  - tool_start event → show loading indicator
+  - tool_end event → display result
+  - Token streaming → show agent's response text
+  - The agent formats the RAG answer as regular markdown text
+
+OPTIONAL FRONTEND ENHANCEMENTS:
+
+  a) INDEXING PROGRESS INDICATOR
+     - index_handbook can take 2-4 minutes for large documents
+     - The frontend already shows tool_start/tool_end events
+     - Optional: show a special progress bar for index_handbook
+     - The tool_start event will include: {"tool": "index_handbook", ...}
+
+  b) HANDBOOK STATUS BADGE
+     - After indexing, state shows rag_document_name
+     - Optional: show a badge in the chat header like
+       "Handbook: ICOFAR_Handbook.pdf (1847 chunks)"
+     - Data source: the tool_end result from index_handbook contains:
+       document_name, total_pages, total_chunks
+
+  c) SOURCE CITATIONS UI
+     - ask_handbook returns a "sources" array with page numbers
+     - Optional: render these as expandable citation cards
+     - Each source has: snippet, page, similarity score
+     - Could link to a PDF viewer at the specific page
+
+  d) "ASK HANDBOOK" QUICK ACTION
+     - Optional: add a button/shortcut in the chat input area
+     - When clicked, prefixes the user's message with
+       "According to the handbook, " to hint the agent
+
+
+================================================================================
+8. SSE EVENTS FOR RAG TOOLS
+================================================================================
+
+The RAG tools emit standard SSE events. Here's what the frontend receives:
+
+--- index_handbook ---
+
+  tool_start:
+    {
+      "tool": "index_handbook",
+      "args": {"file_path": "/path/to/ICOFAR.pdf"}
+    }
+
+  tool_end:
+    {
+      "tool": "index_handbook",
+      "success": true,
+      "summary": "Indexed 'ICOFAR_Handbook.pdf': 474 pages, 1847 chunks stored in 180.5s.",
+      "result": {
+        "document_name": "ICOFAR_Handbook.pdf",
+        "total_pages": 474,
+        "total_chunks": 1847,
+        "chunks_stored": 1847,
+        "already_indexed": false,
+        "duration_seconds": 180.5
+      }
+    }
+
+--- ask_handbook ---
+
+  tool_start:
+    {
+      "tool": "ask_handbook",
+      "args": {"question": "What are the key controls for revenue?"}
+    }
+
+  tool_end:
+    {
+      "tool": "ask_handbook",
+      "success": true,
+      "summary": "Answered from 'ICOFAR_Handbook.pdf' using 10 relevant sections.",
+      "result": {
+        "answer": "According to the ICOFAR Handbook (Pages 127-131)...",
+        "sources": [
+          {"snippet": "Control testing requires...", "page": 127, "similarity": 0.892},
+          {"snippet": "The auditor must verify...", "page": 128, "similarity": 0.856}
+        ],
+        "chunks_retrieved": 10,
+        "document_name": "ICOFAR_Handbook.pdf",
+        "duration_seconds": 3.2
+      }
+    }
+
+
+================================================================================
+9. TOOL ADAPTER — SLIMMING (OPTIONAL)
+================================================================================
+
+Currently, the RAG tools are NOT in the _SLIM_RETURN_TOOLS set in
+server/tool_adapter.py. This means full results are returned to the LLM.
+
+This is fine because:
+  - ask_handbook results are small (answer text + source snippets)
+  - index_handbook results are small (just counts)
+
+If you want to add slimming later (e.g., to strip source snippets from
+the LLM context), add to server/tool_adapter.py:
+
+  _SLIM_RETURN_TOOLS = {
+      "load_rcm",
+      "run_test_of_design",
+      ...
+      "ask_handbook",          # <-- add this
+  }
+
+  # In _make_slim_result(), add:
+  if tool_name == "ask_handbook":
+      return {
+          "answer": full_data.get("answer", ""),
+          "chunks_retrieved": full_data.get("chunks_retrieved", 0),
+          "document_name": full_data.get("document_name", ""),
+      }
+
+This keeps the full sources for the frontend (via tool_results_cache)
+while giving the LLM only the answer text.
+
+
+================================================================================
+10. API ENDPOINTS (IF NEEDED)
+================================================================================
+
+The RAG engine works entirely through the chat agent (tool calls via SSE).
+No new REST endpoints are strictly needed.
+
+However, if you want direct API access for admin or debugging:
+
+EXISTING ENDPOINTS THAT ALREADY WORK:
+  POST /api/embeddings/search   — search RAG chunks directly
+    Body: { "projectId": "default-rag", "queryVector": [...], "topK": 10 }
+
+  GET /api/embeddings?projectId=default-rag  — list indexed chunks
+
+  DELETE /api/embeddings/{id}?projectId=default-rag  — delete a chunk
+
+OPTIONAL NEW ENDPOINTS (if needed):
+  You could add routes in server/routes/ for:
+  - GET  /api/rag/status?projectId=X    → engine.is_indexed(project_id)
+  - POST /api/rag/ingest                → engine.ingest(file_path, project_id)
+  - POST /api/rag/query                 → engine.query(question, project_id)
+  - DELETE /api/rag/index?projectId=X   → engine.delete_index(project_id)
+
+  These are NOT required for the chat flow but useful for:
+  - Admin panel to pre-index handbooks without chat
+  - Health checks to verify indexing status
+  - Bulk cleanup of indexed documents
+
+
+================================================================================
+11. CONFIGURATION
+================================================================================
+
+All config comes from engines/config.py (single source of truth):
+
+  AZURE_OPENAI_ENDPOINT              — LLM endpoint (for answer generation)
+  AZURE_OPENAI_API_KEY               — API key
+  AZURE_OPENAI_DEPLOYMENT            — GPT model (gpt-5.2-chat)
+  AZURE_OPENAI_API_VERSION           — API version
+  AZURE_OPENAI_EMBEDDING_DEPLOYMENT  — Embedding model (text-embedding-ada-002)
+
+RAG-specific constants in engines/RAGEngine.py:
+
+  CHUNK_SIZE_TOKENS = 512        — Target chunk size (approx tokens)
+  CHUNK_OVERLAP_TOKENS = 100     — Overlap between chunks
+  BATCH_SIZE = 16                — Embedding API batch size
+  DEFAULT_TOP_K = 10             — Chunks retrieved per query
+  MAX_CONTEXT_CHARS = 12000      — Max context sent to LLM for answer
+
+Cosmos DB connection (from environment variables):
+
+  COSMOS_ENDPOINT                — Cosmos DB endpoint URL
+  COSMOS_KEY                     — Cosmos DB primary key
+  COSMOS_DATABASE                — Database name
+
+These are the same env vars already used by the existing system.
+No new configuration needed.
+
+
+================================================================================
+12. TESTING CHECKLIST
+================================================================================
+
+BACKEND:
+
+  [ ] Verify Cosmos DB "Embeddings" container exists and has vector index
+      - Path: /embedding
+      - Dimensions: 1536
+      - Distance: cosine
+      - Type: quantizedFlat
+
+  [ ] Verify Azure OpenAI embedding model is deployed
+      - Model: text-embedding-ada-002
+      - Deployment name matches AZURE_OPENAI_EMBEDDING_DEPLOYMENT in config
+
+  [ ] Test ingestion:
+      - Upload a small test PDF (5-10 pages)
+      - Call index_handbook via chat: "Index the handbook at /path/to/test.pdf"
+      - Verify chunks appear in Cosmos (query Embeddings container)
+      - Verify metadata.type == "rag_chunk" on all chunks
+
+  [ ] Test deduplication:
+      - Try indexing the same file again
+      - Should return "Already indexed" without creating new chunks
+      - Try with force_reindex=True — should delete old + create new
+
+  [ ] Test querying:
+      - Ask a question about the indexed document
+      - Verify answer cites page numbers
+      - Verify sources array contains relevant snippets
+
+  [ ] Test isolation:
+      - Index a document under project "A"
+      - Query under project "B" → should return "no relevant information"
+
+  [ ] Test large document (474 pages):
+      - Monitor memory usage during ingestion
+      - Verify all chunks are stored
+      - Verify query latency remains under 5 seconds
+
+FRONTEND:
+
+  [ ] Verify tool_start event renders loading state for index_handbook
+  [ ] Verify tool_end event displays result (chunk count, page count)
+  [ ] Verify ask_handbook answer renders as regular markdown
+  [ ] Verify long indexing (2-4 min) doesn't timeout the SSE connection
+  [ ] (Optional) Test source citation rendering if implemented
+
+
+================================================================================
+13. TROUBLESHOOTING
+================================================================================
+
+ISSUE: "No handbook indexed yet" error
+CAUSE: state.rag_project_id is None — no document has been indexed
+FIX:   User needs to run index_handbook first
+
+ISSUE: Indexing fails with "Parse error"
+CAUSE: Document_Intelligence couldn't parse the file
+FIX:   Check Azure Document Intelligence credentials in engines/config.py
+       Verify DI_KEY and DI_ENDPOINT are set
+
+ISSUE: Indexing completes but queries return no results
+CAUSE: Likely a projectId mismatch between ingest and query
+FIX:   Check that rag_project_id is consistent. Default is "default-rag".
+       Verify chunks exist in Cosmos: GET /api/embeddings?projectId=default-rag
+
+ISSUE: Answer quality is poor / hallucinating
+CAUSE: Chunks may not contain relevant content, or top_k too low
+FIX:   Increase top_k (try 15-20), or adjust CHUNK_SIZE_TOKENS for better
+       section coverage. Verify the document was fully parsed.
+
+ISSUE: Embedding API rate limiting
+CAUSE: Too many concurrent embedding calls
+FIX:   RAGEngine uses batch_size=16 (Azure limit). If rate-limited,
+       add retry logic or reduce BATCH_SIZE in engines/RAGEngine.py.
+
+ISSUE: High Cosmos RU consumption
+CAUSE: Vector search is more expensive than regular queries
+FIX:   Monitor RU usage. Each vector search ≈ 5-10 RU.
+       Consider using DiskANN index instead of quantizedFlat for
+       larger datasets (10,000+ chunks).
+
+ISSUE: Chunks from RAG mixing with evidence validator embeddings
+CAUSE: Both use the same Embeddings container
+FIX:   RAG queries filter on metadata.type == "rag_chunk".
+       This is handled automatically. If missing, check that
+       _store_chunks_cosmos() sets the metadata correctly.
+
+
+================================================================================
+END OF GUIDE
+================================================================================

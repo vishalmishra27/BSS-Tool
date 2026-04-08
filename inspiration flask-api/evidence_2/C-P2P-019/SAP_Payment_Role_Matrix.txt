@@ -1,0 +1,22 @@
+SAP PAYMENT AUTHORIZATION — ROLE MATRIX
+Export Date: 2024-06-22 | Source: SAP Role Administration (PFCG)
+
+ROLE: PAY_INITIATE
+  Description: Create and submit payment batches
+  Assigned To: AP Clerk (SRAO), AP Senior Clerk (RDESAI)
+  Transactions: F110 (Payment Run), FBL1N (Vendor Line Items)
+
+ROLE: PAY_RELEASE
+  Description: Review and release payment batches for bank transmission
+  Assigned To: Treasury Manager (VRAO)
+  Transactions: F110 (Release), FF67 (Bank Statement)
+
+ROLE: PAY_RELEASE_BACKUP
+  Description: Emergency payment release (backup)
+  Assigned To: AP Manager (LPILLAI)
+  Conditions: Only when Treasury Manager is unavailable
+  Documentation: NONE (to be formalized)
+
+SoD RULE: PAY_INITIATE and PAY_RELEASE cannot be assigned to same user
+  Enforcement: SAP blocks release if initiator = releaser
+  Exception Process: NOT DEFINED

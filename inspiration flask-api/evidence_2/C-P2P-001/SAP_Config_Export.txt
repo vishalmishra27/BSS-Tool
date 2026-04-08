@@ -1,0 +1,20 @@
+SAP CONFIGURATION EXPORT — Purchase Requisition Approval Workflow
+Export Date: 2024-06-10 | Exported By: IT Admin - Raj Kumar
+
+Transaction: SPRO > Materials Management > Purchasing > Requisition > Release Strategy
+
+Release Strategy: REL_PR_01
+  Condition: PR Amount >= $5,000.00
+  Release Code 1: DEPT_HEAD (Department Head)
+  Release Code 2: FIN_MGR (Finance Manager)
+  Release Sequence: Sequential (Code 1 must complete before Code 2)
+  Status After Release: "Approved" — eligible for PO conversion
+
+Release Strategy: REL_PR_02
+  Condition: PR Amount < $5,000.00
+  Release Code 1: DEPT_HEAD (Department Head)
+  Release Sequence: Single level
+  Status After Release: "Approved"
+
+Configuration Flag: MANDATORY_RELEASE = YES
+Override Allowed: NO (requires config change via IT Change Management)
