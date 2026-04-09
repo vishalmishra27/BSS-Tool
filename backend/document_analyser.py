@@ -14,7 +14,7 @@ import os
 import re
 import json
 import logging
-from groq import Groq
+from openai import AzureOpenAI
 from dotenv import load_dotenv
 
 from pdf_parser import process_pdf   # identical copy from AAA 2
@@ -22,7 +22,7 @@ from pdf_parser import process_pdf   # identical copy from AAA 2
 load_dotenv()
 logger = logging.getLogger(__name__)
 
-MODEL = "llama-3.3-70b-versatile"
+MODEL = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o")
 _client = None
 
 # ── Prompts (same intent as AAA 2 graph_rag.py) ────────────────────────────────
@@ -96,13 +96,18 @@ def _retrieve_chunks(chunks: list[dict], query: str, top_k: int = 12) -> list[di
 def _call_llm(prompt: str, max_tokens: int = 4096, json_mode: bool = False) -> str:
     global _client
     if _client is None:
-        api_key = os.getenv("GROQ_API_KEY")
-        if not api_key:
+        api_key = os.getenv("AZURE_OPENAI_KEY")
+        endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
+        if not api_key or not endpoint:
             raise RuntimeError(
-                "GROQ_API_KEY is not configured. OCR routes are available, but analysis "
-                "and extraction need a Groq API key in the backend environment."
+                "AZURE_OPENAI_KEY and AZURE_OPENAI_ENDPOINT are not configured. "
+                "Add them to your .env file to enable document analysis."
             )
-        _client = Groq(api_key=api_key)
+        _client = AzureOpenAI(
+            api_key=api_key,
+            azure_endpoint=endpoint,
+            api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-12-01-preview"),
+        )
 
     kwargs = dict(
         model=MODEL,

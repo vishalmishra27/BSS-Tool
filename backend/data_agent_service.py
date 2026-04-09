@@ -9,7 +9,7 @@ import json
 import uuid
 import datetime
 import logging
-from openai import OpenAI
+from openai import AzureOpenAI
 from dotenv import load_dotenv
 from data_agent_tools import (
     DATA_TOOL_DEFINITIONS, DATA_TOOL_DISPATCH,
@@ -19,8 +19,12 @@ from data_agent_tools import (
 load_dotenv()
 logger = logging.getLogger(__name__)
 
-client = OpenAI(api_key=os.getenv("GROQ_API_KEY"))
-MODEL = "gpt-4o"
+client = AzureOpenAI(
+    api_key=os.getenv("AZURE_OPENAI_KEY"),
+    azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+    api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-12-01-preview"),
+)
+MODEL = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o")
 
 SYSTEM_PROMPT = """You are the Data Management Agent for the BSS Migration Assurance Tool.
 You help users upload, sanitize, and analyze CSV/PSV datasets against a PostgreSQL database.

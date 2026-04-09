@@ -14,7 +14,7 @@ import psycopg2
 import psycopg2.extras
 from flask import Blueprint, request, jsonify, send_file
 from werkzeug.utils import secure_filename
-from groq import Groq
+from openai import AzureOpenAI
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -391,13 +391,17 @@ def execute_sql():
 logger = logging.getLogger(__name__)
 
 _client_instance = None
-def _get_groq():
+def _get_azure_client():
     global _client_instance
     if not _client_instance:
-        _client_instance = Groq(api_key=os.getenv("GROQ_API_KEY"))
+        _client_instance = AzureOpenAI(
+            api_key=os.getenv("AZURE_OPENAI_KEY"),
+            azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+            api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-12-01-preview"),
+        )
     return _client_instance
 
-GROQ_MODEL = "llama-3.3-70b-versatile"
+GROQ_MODEL = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o")
 
 TOOL_DEFS = [
     {"type": "function", "function": {
@@ -610,7 +614,7 @@ RULES:
     messages.append({"role": "user", "content": message})
 
     try:
-        groq = _get_groq()
+        groq = _get_azure_client()
         response = groq.chat.completions.create(model=GROQ_MODEL, messages=messages, tools=TOOL_DEFS, tool_choice="auto", max_tokens=1024, temperature=0)
     except Exception as e:
         return jsonify({'reply': f'AI error: {str(e)}', 'tool_used': None})

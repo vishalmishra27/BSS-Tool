@@ -727,10 +727,14 @@ except Exception as e:
 
 # PDF analysis function (moved from old agent_service)
 def analyse_pdf_with_claude(base64_content, media_type, filename):
-    from groq import Groq as _Groq
-    _client = _Groq(api_key=os.getenv("GROQ_API_KEY"))
+    from openai import AzureOpenAI as _AzureOpenAI
+    _client = _AzureOpenAI(
+        api_key=os.getenv("AZURE_OPENAI_KEY"),
+        azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+        api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-12-01-preview"),
+    )
     response = _client.chat.completions.create(
-        model="llama-3.3-70b-versatile", max_tokens=2048,
+        model=os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o"), max_tokens=2048,
         messages=[{"role": "user", "content": [
             {"type": "image_url", "image_url": {"url": f"data:{media_type};base64,{base64_content}", "detail": "high"}},
             {"type": "text", "text": (
