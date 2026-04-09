@@ -112,8 +112,7 @@ def _call_llm(prompt: str, max_tokens: int = 4096, json_mode: bool = False) -> s
     kwargs = dict(
         model=MODEL,
         messages=[{"role": "user", "content": prompt}],
-        max_tokens=max_tokens,
-        temperature=0,
+        max_completion_tokens=max_tokens
     )
     if json_mode:
         kwargs["response_format"] = {"type": "json_object"}
