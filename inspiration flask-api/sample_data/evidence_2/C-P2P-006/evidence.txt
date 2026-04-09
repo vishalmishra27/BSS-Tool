@@ -1,0 +1,13 @@
+Sample ID: S1
+Source Document: Vendor #V-10289 / SUP-SCR-0289
+Test Date: 2024-06-13
+Tested By: Auditor - Sanjay Kulkarni
+
+New supplier "Zenith Logistics Pvt. Ltd." onboarded on 2024-04-10.
+Screening performed by Vendor Management Lead Arjun Reddy.
+Financial health: D&B score 72 (threshold >= 60). Regulatory: GST verified, ISO 9001 on file.
+References: 2 of 3 required contacted. Third reference: "unable to reach, will follow up" —
+no follow-up documented as of walkthrough date.
+Vendor activated in SAP on 2024-04-12 with 2 of 3 references completed.
+Screening form requires all 3 but has no hard block — activation proceeded with sign-off
+noting the pending item. No system enforcement linking screening completion to activation.

@@ -1,0 +1,12 @@
+trigger: "Rename a column, change column header name, rename field"
+title: "Rename Column"
+steps:
+  - "Use modify_rcm(action='rename_column', column_name='Old Name', new_name='New Name')"
+  - "Verify with inspect_dataframe(mode='info') to see updated column names"
+notes:
+  - "Column must exist — use inspect_dataframe(mode='info') to check column names first"
+  - "The column_name parameter must match the EXACT current name"
+tags:
+  - modify
+  - rename
+  - column

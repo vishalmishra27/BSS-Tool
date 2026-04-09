@@ -1,0 +1,12 @@
+Sample ID: S1
+Source Document: GR-44521 / PO-88955 / Packing Slip
+Test Date: 2024-06-16
+Tested By: Auditor - Sanjay Kulkarni
+
+GR-44521 for PO-88955 (200 units Part #XR-440 from Acme Industrial).
+Delivery arrived 2024-05-20 at 9:15 AM. Two warehouse staff counted — 200 units confirmed.
+Visual inspection of 10% (20 units) — no damage. Count matched PO and packing slip.
+GR entered in SAP by Mohan Das at 10:05 AM. Supervisor Manoj Singh confirmed at 10:20 AM.
+One recent discrepancy: GR-44498 on 2024-05-18 (5 units short), documented via GR-DISC-v2 form.
+10% inspection rate is verbal practice — not in any written SOP.
+Single-person receiving happens occasionally when short-staffed (confirmed by Manoj).

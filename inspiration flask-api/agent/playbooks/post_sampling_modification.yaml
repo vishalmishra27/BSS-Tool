@@ -1,0 +1,17 @@
+trigger: "After running sampling engine, modify or update the sampling results or RCM values based on sampling output, change sample counts"
+title: "Post-Sampling Data Modification"
+steps:
+  - "First, verify current data with inspect_dataframe(mode='head') to see column names and current values"
+  - "Use modify_rcm(action='update_values', column_name='<target>', value='<new_value>', condition_column='<filter>', condition_value='<match>') for single-column conditional updates"
+  - "Use modify_rcm(action='bulk_update', updates={'col1': 'val1', 'col2': 'val2'}, condition_column='...', condition_value='...') for multi-column updates"
+  - "Verify changes with inspect_dataframe(mode='head')"
+  - "Save with save_excel(step_name='post_sampling_update')"
+notes:
+  - "The sampling results are merged INTO the RCM DataFrame — columns like Count_of_Samples are on the same df"
+  - "Always inspect_dataframe first to confirm exact column names before modifying"
+  - "Never assume column names — they may vary between RCMs"
+  - "Common columns after sampling: Count_of_Samples, Sample_Size, Sampling_Method"
+tags:
+  - sampling
+  - modify
+  - post-processing

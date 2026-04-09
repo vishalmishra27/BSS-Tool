@@ -1,0 +1,507 @@
+================================================================================
+  RCM UNIVERSE PRESERVATION — END-TO-END FLOW DOCUMENTATION
+================================================================================
+
+  This document describes the complete flow from RCM loading to TOE completion,
+  with specific focus on the changes made to preserve the full RCM universe
+  in all outputs (no controls are silently dropped).
+
+  Key Principle: Every control in the normalized RCM MUST appear in both
+  TOD and TOE final outputs, regardless of missing evidence or prior failures.
+
+================================================================================
+  OVERVIEW OF CHANGES
+================================================================================
+
+  Files Modified:
+  ---------------
+  1. engines/TOD_Engine.py
+     - test_all_tod(): Appends placeholder results for missing-evidence controls
+     - export_tod_workpaper(): Handles "NO EVIDENCE" result type
+     - test_all_toe(): Accepts tod_results param, skips TOD-failed controls
+
+  2. engines/TOE_Engine.py
+     - test_all_toe(): Same changes as TOD_Engine
+
+  3. agent/tools/test_of_design.py
+     - Updated summary display to include "NO EVIDENCE" count
+
+  4. agent/tools/test_of_effectiveness.py
+     - Passes state.tod_results to engine
+     - Updated summary display for new result categories
+
+  5. engines/run_tod_toe.py
+     - Passes tod_results between TOD and TOE runs
+
+================================================================================
+  STEP 1: RCM LOADING (agent/tools/rcm_loader.py)
+================================================================================
+
+  User uploads RCM file (Excel/CSV)
+           │
+           ▼
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │  RCMLoaderTool.execute()                                            │
+  │                                                                     │
+  │  1. Read original Excel → original_df (all columns, original names) │
+  │  2. Normalize columns → df (canonical names: "Control Id", etc.)    │
+  │  3. Trim to engine-required columns only                            │
+  │                                                                     │
+  │  Outputs:                                                           │
+  │    state.rcm_df         = df            (normalized, trimmed)       │
+  │    state.original_rcm_df = original_df  (original, for workpaper)   │
+  └─────────────────────────────────────────────────────────────────────┘
+
+  Example RCM with 20 controls:
+  ┌──────────────┬─────────────┬──────────────────────────┐
+  │ Control Id   │ Risk Id     │ Control Description      │
+  ├──────────────┼─────────────┼──────────────────────────┤
+  │ C-P2P-001    │ R-P2P-01    │ Segregation of duties... │
+  │ C-P2P-002    │ R-P2P-02    │ Three-way match...       │
+  │ C-P2P-003    │ R-P2P-03    │ Invoice approval...      │
+  │ ...          │ ...         │ ...                      │
+  │ C-P2P-020    │ R-P2P-20    │ Vendor master changes... │
+  └──────────────┴─────────────┴──────────────────────────┘
+
+================================================================================
+  STEP 2: TOD PREVIEW (agent/tools/preview_tod_attributes.py)
+================================================================================
+
+  User provides TOD evidence folder path
+           │
+           ▼
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │  PreviewTODAttributesTool.execute()                                 │
+  │                                                                     │
+  │  1. Load evidence folder → tod_bank                                 │
+  │     (only controls WITH evidence folders appear in tod_bank)        │
+  │                                                                     │
+  │  2. Generate LLM schemas for controls in tod_bank                   │
+  │                                                                     │
+  │  3. Cache schemas for user approval:                                │
+  │     state.pending_tod_schemas = {...}                               │
+  │     state.pending_tod_evidence_folder = "/path/to/evidence"         │
+  └─────────────────────────────────────────────────────────────────────┘
+
+  Evidence folder structure:
+  evidence_tod/
+    ├── C-P2P-001/          ← Evidence exists
+    │   └── walkthrough.txt
+    ├── C-P2P-002/          ← Evidence exists
+    │   └── narrative.docx
+    ├── C-P2P-003/          ← Evidence exists
+    │   └── SOP.pdf
+    │
+    │   (C-P2P-004 through C-P2P-006 have NO folders — missing evidence)
+    │
+    ├── C-P2P-007/          ← Evidence exists
+    │   └── control_doc.txt
+    └── ...
+
+  tod_bank after loading: {C-P2P-001, C-P2P-002, C-P2P-003, C-P2P-007, ...}
+  (Only 17 of 20 controls have evidence folders)
+
+================================================================================
+  STEP 3: TOD EXECUTION (agent/tools/test_of_design.py)
+================================================================================
+
+  User approves schemas → Agent calls run_test_of_design
+           │
+           ▼
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │  TestOfDesignTool.execute()                                         │
+  │                                                                     │
+  │  1. Load tod_bank from evidence folder                              │
+  │  2. Create RCMControlTester with normalized_rcm_df                  │
+  │  3. Call tester.test_all_tod(tod_bank, pre_schemas=...)             │
+  └─────────────────────────────────────────────────────────────────────┘
+           │
+           ▼
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │  RCMControlTester.test_all_tod()    [TOD_Engine.py]                 │
+  │                                                                     │
+  │  ══════════════════════════════════════════════════════════════════ │
+  │  PHASE 1: Filter to controls with evidence                          │
+  │  ══════════════════════════════════════════════════════════════════ │
+  │                                                                     │
+  │  valid = {}                                                         │
+  │  for cid, samples in tod_bank.items():                              │
+  │      if cid in self.rcm_lookup:                                     │
+  │          valid[cid] = [samples[0]]   # TOD uses 1 sample            │
+  │                                                                     │
+  │  → valid contains 17 controls (those with evidence)                 │
+  │                                                                     │
+  │  ══════════════════════════════════════════════════════════════════ │
+  │  PHASE 2: Generate schemas + Evaluate (LLM calls)                   │
+  │  ══════════════════════════════════════════════════════════════════ │
+  │                                                                     │
+  │  For each control in valid:                                         │
+  │    - Generate schema (if not pre-approved)                          │
+  │    - Evaluate single walkthrough sample                             │
+  │    - Detect contradictions → Re-evaluate if needed                  │
+  │    - Aggregate into TODControlResult                                │
+  │                                                                     │
+  │  → control_results contains 17 evaluated TODControlResults          │
+  │                                                                     │
+  │  ══════════════════════════════════════════════════════════════════ │
+  │  ★ CHANGE: PHASE 3 — Append placeholder results for missing controls│
+  │  ══════════════════════════════════════════════════════════════════ │
+  │                                                                     │
+  │  # Find all RCM controls NOT in the evaluated set                   │
+  │  evaluated_cids = set(r.control_id for r in control_results)        │
+  │  no_evidence_cids = sorted(                                         │
+  │      cid for cid in self.rcm_lookup if cid not in evaluated_cids    │
+  │  )                                                                  │
+  │                                                                     │
+  │  # Create placeholder TODControlResult for each                     │
+  │  for cid in no_evidence_cids:                                       │
+  │      rcm = self.rcm_lookup[cid]                                     │
+  │      placeholder = TODControlResult(                                │
+  │          control_id=cid,                                            │
+  │          result="NO EVIDENCE",           ← New result type          │
+  │          design_adequate="Unable to Assess",                        │
+  │          deficiency_type="Unable to Assess",                        │
+  │          gap_identified="Evidence folder not found for this ctrl.", │
+  │          overall_remarks="Evidence folder not found — no TOD "      │
+  │                          "evidence was provided. Manual review "    │
+  │                          "required.",                               │
+  │          sample_result=None,             ← No sample evaluated      │
+  │          ...                                                        │
+  │      )                                                              │
+  │      control_results.append(placeholder)                            │
+  │      print(f"  [SKIP] {cid}: Evidence folder not found")            │
+  │                                                                     │
+  │  → control_results now contains ALL 20 RCM controls                 │
+  │                                                                     │
+  └─────────────────────────────────────────────────────────────────────┘
+           │
+           ▼
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │  TOD Output Summary (printed to console):                           │
+  │                                                                     │
+  │  ======================================================================
+  │    TOD COMPLETE in 45.2s
+  │    Controls: 20 (RCM universe)
+  │    [OK] Design Adequate: 15 | [FAIL] Design Gap: 2 | [SKIP] No Evidence: 3
+  │  ======================================================================
+  │                                                                     │
+  │  Cached in state:                                                   │
+  │    state.tod_results = [20 TODControlResults]                       │
+  │    state.tod_schemas = {17 schemas for evaluated controls}          │
+  └─────────────────────────────────────────────────────────────────────┘
+
+  Example TOD Results (all 20 controls):
+  ┌──────────────┬────────────┬─────────────────┬──────────────────────────┐
+  │ Control Id   │ Result     │ Design Adequate │ Remarks                  │
+  ├──────────────┼────────────┼─────────────────┼──────────────────────────┤
+  │ C-P2P-001    │ PASS       │ Yes             │ Design adequate...       │
+  │ C-P2P-002    │ PASS       │ Yes             │ Design adequate...       │
+  │ C-P2P-003    │ FAIL       │ No              │ Missing segregation...   │
+  │ C-P2P-004    │ NO EVIDENCE│ Unable to Assess│ Evidence folder not found│
+  │ C-P2P-005    │ NO EVIDENCE│ Unable to Assess│ Evidence folder not found│
+  │ C-P2P-006    │ NO EVIDENCE│ Unable to Assess│ Evidence folder not found│
+  │ C-P2P-007    │ PASS       │ Yes             │ Design adequate...       │
+  │ ...          │ ...        │ ...             │ ...                      │
+  │ C-P2P-019    │ FAIL       │ No              │ Approval threshold gap...│
+  │ C-P2P-020    │ PASS       │ Yes             │ Design adequate...       │
+  └──────────────┴────────────┴─────────────────┴──────────────────────────┘
+
+================================================================================
+  STEP 4: SAMPLING ENGINE (agent/tools/sampling_engine.py)
+================================================================================
+
+  Agent calls run_sampling_engine
+           │
+           ▼
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │  SamplingEngineTool.execute()                                       │
+  │                                                                     │
+  │  Uses state.rcm_df (normalized RCM) to determine sample counts      │
+  │  based on Control Frequency + Risk Level → KPMG table lookup        │
+  │                                                                     │
+  │  Writes count_of_samples column back into state.rcm_df              │
+  │                                                                     │
+  │  (No changes here — sampling uses full RCM, not filtered by TOD)    │
+  └─────────────────────────────────────────────────────────────────────┘
+
+================================================================================
+  STEP 5: TOE PREVIEW (agent/tools/preview_toe_attributes.py)
+================================================================================
+
+  User provides TOE evidence folder path
+           │
+           ▼
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │  PreviewTOEAttributesTool.execute()                                 │
+  │                                                                     │
+  │  Similar to TOD preview — generates schemas for controls with       │
+  │  evidence in the TOE folder.                                        │
+  │                                                                     │
+  │  NOTE: If state.tod_schemas exists, TOE can reuse them directly     │
+  │        (no separate preview needed).                                │
+  └─────────────────────────────────────────────────────────────────────┘
+
+================================================================================
+  STEP 6: TOE EXECUTION (agent/tools/test_of_effectiveness.py)
+================================================================================
+
+  User approves schemas → Agent calls run_test_of_effectiveness
+           │
+           ▼
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │  TestOfEffectivenessTool.execute()                                  │
+  │                                                                     │
+  │  ★ CHANGE: Pass TOD results to engine                               │
+  │                                                                     │
+  │  results = tester.test_all_toe(                                     │
+  │      toe_bank,                                                      │
+  │      max_workers=5,                                                 │
+  │      pre_schemas=pre_schemas,                                       │
+  │      tod_results=getattr(state, 'tod_results', None),  ← NEW PARAM  │
+  │  )                                                                  │
+  └─────────────────────────────────────────────────────────────────────┘
+           │
+           ▼
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │  RCMControlTester.test_all_toe()    [TOD_Engine.py / TOE_Engine.py] │
+  │                                                                     │
+  │  ══════════════════════════════════════════════════════════════════ │
+  │  ★ CHANGE: Extract TOD-failed and TOD-no-evidence control IDs       │
+  │  ══════════════════════════════════════════════════════════════════ │
+  │                                                                     │
+  │  tod_failed_cids = set()                                            │
+  │  tod_no_evidence_cids = set()                                       │
+  │  if tod_results:                                                    │
+  │      for tr in tod_results:                                         │
+  │          if tr.result == "FAIL":                                    │
+  │              tod_failed_cids.add(tr.control_id)                     │
+  │          elif tr.result == "NO EVIDENCE":                           │
+  │              tod_no_evidence_cids.add(tr.control_id)                │
+  │                                                                     │
+  │  → tod_failed_cids = {C-P2P-003, C-P2P-019}                         │
+  │  → tod_no_evidence_cids = {C-P2P-004, C-P2P-005, C-P2P-006}         │
+  │                                                                     │
+  │  ══════════════════════════════════════════════════════════════════ │
+  │  ★ CHANGE: Skip TOD-failed controls during filtering                │
+  │  ══════════════════════════════════════════════════════════════════ │
+  │                                                                     │
+  │  valid = {}                                                         │
+  │  for cid, samples in toe_bank.items():                              │
+  │      if cid in tod_failed_cids:                                     │
+  │          print(f"  [SKIP] {cid}: TOD Failed — skipping TOE eval")   │
+  │          continue   ← Even if TOE evidence exists, skip it!         │
+  │      if cid in tod_no_evidence_cids:                                │
+  │          print(f"  [SKIP] {cid}: TOD had no evidence — skipping")   │
+  │          continue                                                   │
+  │      if cid in self.rcm_lookup:                                     │
+  │          valid[cid] = samples                                       │
+  │                                                                     │
+  │  → valid contains 15 controls (those that passed TOD + have TOE     │
+  │    evidence). NO LLM calls for the 5 skipped controls.              │
+  │                                                                     │
+  │  ══════════════════════════════════════════════════════════════════ │
+  │  PHASE 1 & 2: Generate schemas + Evaluate samples (as before)       │
+  │  ══════════════════════════════════════════════════════════════════ │
+  │                                                                     │
+  │  For each control in valid:                                         │
+  │    - Use pre-approved schema (or generate if missing)               │
+  │    - Evaluate N samples (based on count_of_samples from RCM)        │
+  │    - Aggregate into TOEControlResult                                │
+  │                                                                     │
+  │  → control_results contains 15 evaluated TOEControlResults          │
+  │                                                                     │
+  │  ══════════════════════════════════════════════════════════════════ │
+  │  ★ CHANGE: Append placeholder results for TOD-failed controls       │
+  │  ══════════════════════════════════════════════════════════════════ │
+  │                                                                     │
+  │  for cid in sorted(tod_failed_cids):                                │
+  │      rcm = self.rcm_lookup.get(cid)                                 │
+  │      placeholder = TOEControlResult(                                │
+  │          control_id=cid,                                            │
+  │          total_samples=0,                                           │
+  │          passed_samples=0,                                          │
+  │          failed_samples=0,                                          │
+  │          deviation_rate=0.0,                                        │
+  │          operating_effectiveness="TOD Failed",  ← Special status    │
+  │          deficiency_type="TOD Failed — TOE not required",           │
+  │          overall_remarks="Test of Design (TOD) failed for this "    │
+  │                          "control. TOE was not performed. The "     │
+  │                          "design deficiency must be remediated "    │
+  │                          "before operating effectiveness can be "   │
+  │                          "assessed.",                               │
+  │          sample_results=[],              ← No samples evaluated     │
+  │          ...                                                        │
+  │      )                                                              │
+  │      control_results.append(placeholder)                            │
+  │      print(f"  [TOD-FAIL] {cid}: TOD Failed — placeholder added")   │
+  │                                                                     │
+  │  ══════════════════════════════════════════════════════════════════ │
+  │  ★ CHANGE: Append placeholder results for TOD-no-evidence controls  │
+  │  ══════════════════════════════════════════════════════════════════ │
+  │                                                                     │
+  │  for cid in sorted(tod_no_evidence_cids):                           │
+  │      rcm = self.rcm_lookup.get(cid)                                 │
+  │      placeholder = TOEControlResult(                                │
+  │          control_id=cid,                                            │
+  │          operating_effectiveness="No Evidence",                     │
+  │          deficiency_type="Unable to Assess",                        │
+  │          overall_remarks="No evidence was provided for this "       │
+  │                          "control in TOD. TOE was not performed.",  │
+  │          sample_results=[],                                         │
+  │          ...                                                        │
+  │      )                                                              │
+  │      control_results.append(placeholder)                            │
+  │      print(f"  [NO-EVID] {cid}: No TOD evidence — placeholder")     │
+  │                                                                     │
+  │  ══════════════════════════════════════════════════════════════════ │
+  │  ★ CHANGE: Append placeholder results for missing TOE evidence      │
+  │  ══════════════════════════════════════════════════════════════════ │
+  │                                                                     │
+  │  # Any RCM control not yet in results (no TOE evidence folder)      │
+  │  evaluated_cids = set(r.control_id for r in control_results)        │
+  │  no_toe_evidence_cids = sorted(                                     │
+  │      cid for cid in self.rcm_lookup if cid not in evaluated_cids    │
+  │  )                                                                  │
+  │                                                                     │
+  │  for cid in no_toe_evidence_cids:                                   │
+  │      placeholder = TOEControlResult(                                │
+  │          control_id=cid,                                            │
+  │          operating_effectiveness="No Evidence",                     │
+  │          deficiency_type="Unable to Assess",                        │
+  │          overall_remarks="Evidence folder not found — no TOE "      │
+  │                          "evidence was provided. Manual review "    │
+  │                          "required.",                               │
+  │          sample_results=[],                                         │
+  │          ...                                                        │
+  │      )                                                              │
+  │      control_results.append(placeholder)                            │
+  │      print(f"  [SKIP] {cid}: TOE evidence folder not found")        │
+  │                                                                     │
+  │  → control_results now contains ALL 20 RCM controls                 │
+  │                                                                     │
+  └─────────────────────────────────────────────────────────────────────┘
+           │
+           ▼
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │  TOE Output Summary (printed to console):                           │
+  │                                                                     │
+  │  ======================================================================
+  │    TOE COMPLETE in 92.5s
+  │    Controls: 20 (RCM universe) | Evaluated: 15 | Samples: 47
+  │    [OK] Effective: 12 | [!] Exceptions: 2 | [FAIL] Not Effective: 1
+  │    [TOD-FAIL] Skipped (TOD Failed): 2
+  │    [NO-EVID] Skipped (No Evidence): 3
+  │  ======================================================================
+  └─────────────────────────────────────────────────────────────────────┘
+
+  Example TOE Results (all 20 controls):
+  ┌──────────────┬───────────────────────┬───────────┬──────────────────────┐
+  │ Control Id   │ Operating Effective.  │ Samples   │ Remarks              │
+  ├──────────────┼───────────────────────┼───────────┼──────────────────────┤
+  │ C-P2P-001    │ Effective             │ 3/3 pass  │ All samples passed   │
+  │ C-P2P-002    │ Effective             │ 5/5 pass  │ All samples passed   │
+  │ C-P2P-003    │ TOD Failed            │ 0/0       │ TOD failed, TOE skip │
+  │ C-P2P-004    │ No Evidence           │ 0/0       │ No TOD evidence      │
+  │ C-P2P-005    │ No Evidence           │ 0/0       │ No TOD evidence      │
+  │ C-P2P-006    │ No Evidence           │ 0/0       │ No TOE evidence      │
+  │ C-P2P-007    │ Effective w/ Except.  │ 4/5 pass  │ 1 deviation found    │
+  │ ...          │ ...                   │ ...       │ ...                  │
+  │ C-P2P-019    │ TOD Failed            │ 0/0       │ TOD failed, TOE skip │
+  │ C-P2P-020    │ Effective             │ 2/2 pass  │ All samples passed   │
+  └──────────────┴───────────────────────┴───────────┴──────────────────────┘
+
+================================================================================
+  STEP 7: WORKPAPER EXPORT
+================================================================================
+
+  Both TOD and TOE workpapers are exported to Excel:
+
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │  4_TOD_Results.xlsx                                                 │
+  │                                                                     │
+  │  Sheet 1: Control Summary                                           │
+  │    - ALL 20 controls appear in the summary                          │
+  │    - "NO EVIDENCE" controls show with special status                │
+  │                                                                     │
+  │  Sheet 2+: Per-control workpaper sheets                             │
+  │    - Only generated for controls WITH evidence (17 sheets)          │
+  │    - ★ NO sheets for "No Evidence" controls (skipped)               │
+  └─────────────────────────────────────────────────────────────────────┘
+
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │  5_TOE_Workpaper.xlsx                                               │
+  │                                                                     │
+  │  Sheet 1: Control Summary                                           │
+  │    - ALL 20 controls appear in the summary                          │
+  │    - "TOD Failed" controls show with deficiency_type explanation    │
+  │    - "No Evidence" controls show with "Unable to Assess" status     │
+  │                                                                     │
+  │  Sheet 2+: Per-control workpaper sheets                             │
+  │    - Only generated for controls that were EVALUATED (15 sheets)    │
+  │    - ★ NO sheets for "TOD Failed" controls (skipped)                │
+  │    - ★ NO sheets for "No Evidence" controls (skipped)               │
+  └─────────────────────────────────────────────────────────────────────┘
+
+  Export Code (engines/TOD_Engine.py & TOE_Engine.py):
+  ─────────────────────────────────────────────────────
+  for r in results:
+      # ★ CHANGE: Skip placeholder results — no individual sheet
+      if r.operating_effectiveness in ("No Evidence", "TOD Failed"):
+          continue
+      
+      rcm = self.rcm_lookup.get(r.control_id)
+      if not rcm:
+          continue
+      # ... create sheet ...
+
+================================================================================
+  RESULT TYPE REFERENCE
+================================================================================
+
+  TOD Result Types (TODControlResult.result):
+  ┌──────────────┬────────────────────────────────────────────────────────┐
+  │ Result       │ Meaning                                                │
+  ├──────────────┼────────────────────────────────────────────────────────┤
+  │ PASS         │ Control design is adequate                             │
+  │ FAIL         │ Design gap identified — control needs remediation      │
+  │ NO EVIDENCE  │ No evidence folder found — manual review required      │
+  └──────────────┴────────────────────────────────────────────────────────┘
+
+  TOE Operating Effectiveness Types (TOEControlResult.operating_effectiveness):
+  ┌───────────────────────────┬──────────────────────────────────────────────┐
+  │ Operating Effectiveness   │ Meaning                                      │
+  ├───────────────────────────┼──────────────────────────────────────────────┤
+  │ Effective                 │ All samples passed                           │
+  │ Effective with Exceptions │ Some deviations, but below threshold         │
+  │ Not Effective             │ Deviation rate exceeds threshold             │
+  │ TOD Failed                │ TOD failed — TOE not performed (design issue)│
+  │ No Evidence               │ No evidence provided — unable to assess      │
+  └───────────────────────────┴──────────────────────────────────────────────┘
+
+================================================================================
+  KEY BEHAVIORAL GUARANTEES
+================================================================================
+
+  1. FULL RCM UNIVERSE PRESERVED
+     - Every control in state.rcm_df appears in TOD output
+     - Every control in state.rcm_df appears in TOE output
+     - No controls are silently dropped from any output
+
+  2. TOD-FAILED CONTROLS ARE SKIPPED IN TOE
+     - Even if TOE evidence exists for a TOD-failed control, it is NOT evaluated
+     - Saves API calls (no LLM evaluation for controls that need redesign)
+     - Placeholder result clearly explains: "TOD Failed — TOE not required"
+
+  3. NO-EVIDENCE CONTROLS ARE CLEARLY MARKED
+     - Controls without evidence folders get placeholder results
+     - Clearly marked as "Unable to Assess" with explanatory remarks
+     - Auditor knows exactly which controls need manual review
+
+  4. BACKWARD COMPATIBLE
+     - All existing callers (Flask API, legacy agent, tests) work unchanged
+     - The tod_results parameter defaults to None
+     - When None, TOE behaves exactly as before (no TOD-based skipping)
+
+================================================================================
+  END OF DOCUMENT
+================================================================================

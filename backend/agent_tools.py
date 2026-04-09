@@ -9,13 +9,17 @@ import datetime
 import fitz  # PyMuPDF
 import psycopg2
 import psycopg2.extras
-from groq import Groq
+from openai import AzureOpenAI
 from dotenv import load_dotenv
 
 load_dotenv()
 
-client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-MODEL = "llama-3.3-70b-versatile"
+client = AzureOpenAI(
+    api_key=os.getenv("AZURE_OPENAI_KEY"),
+    azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+    api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-12-01-preview"),
+)
+MODEL = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o")
 
 DB_CONFIG = {
     'host': os.getenv('DB_HOST', 'localhost'),

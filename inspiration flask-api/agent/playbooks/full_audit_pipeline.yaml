@@ -1,0 +1,27 @@
+trigger: "Run a complete end-to-end audit, full analysis pipeline from start to finish, run all steps of the audit"
+title: "Full Audit Pipeline"
+steps:
+  - "1. load_rcm(file_path='<path>') to load the RCM Excel"
+  - "2. inspect_dataframe(mode='info') to understand structure"
+  - "3. run_ai_suggestions() to find gaps in the RCM"
+  - "4. Show suggestions to user, ask which to keep, then merge_suggestions(indices='...')"
+  - "5. run_deduplication() to find duplicate risks/controls"
+  - "6. Show duplicate pairs, ask user which to remove, then remove_duplicates(removals=[...])"
+  - "7. Ask user for TOD evidence folder, then run_test_of_design(evidence_folder='<tod_path>') — uses 1 sample per control"
+  - "8. run_sampling_engine() to calculate sample sizes for TOE"
+  - "9. Ask user for TOE evidence folder (SEPARATE from TOD), then preview_toe_attributes(evidence_folder='<toe_path>') to generate testing attributes for approval"
+  - "10. Wait for user to review and approve attributes in the popup"
+  - "11. run_test_of_effectiveness(evidence_folder='<toe_path>') — uses approved attributes automatically"
+  - "12. save_excel(step_name='final_audit') to save the completed audit"
+notes:
+  - "Always ask user before merging suggestions or removing duplicates — never auto-decide"
+  - "TOD comes BEFORE sampling; sampling comes BEFORE TOE"
+  - "TOD and TOE use SEPARATE evidence folders — ask for each independently"
+  - "TOD uses 1 sample per control; TOE uses multiple samples (determined by sampling)"
+  - "For TOE: ALWAYS run preview_toe_attributes first for user approval, then run the full test"
+  - "Save checkpoints after each major step"
+  - "Each step depends on the RCM being loaded — always start with load_rcm"
+tags:
+  - pipeline
+  - full-audit
+  - workflow

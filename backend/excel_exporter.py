@@ -6,6 +6,7 @@ import pandas as pd
 import re
 import io
 import os
+from typing import Optional
 
 
 def _strip_markdown(text: str) -> str:
@@ -28,7 +29,7 @@ def _clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     return df.map(_strip_markdown)
 
 
-def markdown_table_to_dataframe(markdown_text: str) -> pd.DataFrame | None:
+def markdown_table_to_dataframe(markdown_text: str) -> Optional[pd.DataFrame]:
     """Parse a markdown table from LLM response into a DataFrame."""
     lines = markdown_text.strip().split('\n')
 
@@ -112,7 +113,7 @@ def dataframe_to_excel_bytes(df: pd.DataFrame, sheet_name: str = "Results") -> b
     return output.getvalue()
 
 
-def response_to_dataframe(response_text: str) -> pd.DataFrame | None:
+def response_to_dataframe(response_text: str) -> Optional[pd.DataFrame]:
     """Try to extract a table from the LLM response text."""
     df = markdown_table_to_dataframe(response_text)
     if df is not None and not df.empty:

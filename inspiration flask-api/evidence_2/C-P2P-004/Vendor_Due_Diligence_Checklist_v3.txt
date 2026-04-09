@@ -1,0 +1,39 @@
+VENDOR DUE DILIGENCE CHECKLIST (VEN-DDC-v3)
+Version: 3.0 | Effective: January 2024 | Owner: Vendor Management Lead
+
+VENDOR NAME: ________________________    DATE: _______________
+PREPARED BY: ________________________    VENDOR ID: __________
+
+MANDATORY ITEMS (All must be completed before vendor activation):
+
+[ ] 1. BACKGROUND CHECK
+    - Company registration verified
+    - Director/owner background screening
+    - Reference: ________________
+
+[ ] 2. FINANCIAL STABILITY ASSESSMENT
+    - D&B report obtained (minimum score: 60)
+    - D&B Score: _____
+    - Report date: _______________
+
+[ ] 3. COMPLIANCE CERTIFICATION
+    - GST/Tax registration verified
+    - Industry certifications (ISO, etc.)
+    - Trade license uploaded to portal
+
+[ ] 4. BANK VERIFICATION
+    - Bank details received from vendor
+    - Independent call-back to bank performed
+    - Call-back date: _______________
+    - Verified by: ________________
+
+[ ] 5. CONFLICT OF INTEREST DECLARATION
+    - COI form completed by requesting department
+    - No conflicts identified / Conflicts noted: ____________
+
+SIGN-OFF:
+Prepared by: _________________ Date: _________
+Vendor Management Lead: _________________ Date: _________
+
+NOTE: All 5 items are mandatory. Vendor SHOULD NOT be activated until
+this checklist is fully completed and signed off.

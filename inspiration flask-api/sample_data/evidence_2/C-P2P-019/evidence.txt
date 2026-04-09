@@ -1,0 +1,12 @@
+Sample ID: S1
+Source Document: PAY-2024-W20 / SAP Payment Log / Role Matrix
+Test Date: 2024-06-22
+Tested By: Auditor - Priya Nair
+
+Payment Batch PAY-2024-W20, $485,000 (42 invoices).
+Initiated by AP Clerk Sunita Rao (SRAO). Released by Treasury Manager Vikram Rao (VRAO).
+Tested: SRAO tried to release own batch — SAP blocked.
+PAY_INITIATE and PAY_RELEASE are separate roles (see attached SAP_Payment_Role_Matrix.txt).
+Vikram reviews batch summary before releasing (15-30 min).
+No formal backup/delegation process documented for Treasury Manager absence.
+Vikram mentioned "AP Manager has emergency PAY_RELEASE access" — no documentation.

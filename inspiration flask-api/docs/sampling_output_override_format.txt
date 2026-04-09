@@ -1,0 +1,63 @@
+================================================================================
+  SAMPLING OUTPUT OVERRIDE — INPUT FORMAT SPECIFICATION
+================================================================================
+
+After the sampling engine runs, it determines the number of samples required
+per control.  You can override these sample counts via chat or Excel re-upload.
+
+
+1. OVERRIDE VIA CHAT (single control)
+
+   Tell the agent:
+     "Change CC-01 to 5 samples"
+     "Set the sample count for CTRL-005 to 10"
+
+   The agent uses the modify_sampling_output tool to update the count.
+
+
+2. OVERRIDE VIA EXCEL RE-UPLOAD
+
+   a) After sampling, the normalised_rcm.xlsx in the output folder contains
+      a "count_of_samples" column with the computed values.
+   b) Download normalised_rcm.xlsx (or create a new Excel with the required
+      columns).
+   c) Edit the "count_of_samples" column for the controls you want to change.
+   d) Upload the edited file back.
+
+   The agent uses the upload_sampling_overrides tool to read the file and
+   update both the RCM and the cached sampling results.
+
+
+3. EXCEL FORMAT FOR SAMPLING OVERRIDES
+
+   The uploaded Excel must have at minimum these two columns:
+
+   +------------+-------------------+
+   | Control ID | count_of_samples  |
+   +------------+-------------------+
+   | CC-01      |         5         |
+   | CC-02      |        10         |
+   | CC-03      |         3         |
+   +------------+-------------------+
+
+   Column name detection is flexible:
+     - "Control ID", "Control Id", "control_id" → control identifier
+     - "count_of_samples", "Sample Count", "Samples" → sample count
+
+   Rules:
+     - Control ID column is REQUIRED
+     - count_of_samples must be a non-negative integer
+     - Blank/empty count values are skipped (original count kept)
+     - Only controls that exist in the sampling results are updated
+     - Invalid values (non-numeric, negative) are skipped with a warning
+
+
+4. WHAT HAPPENS AFTER OVERRIDE
+
+   After overriding sample counts:
+     - The RCM dataframe is updated with the new counts
+     - The normalised_rcm.xlsx is re-exported
+     - TOE (Test of Effectiveness) will use the updated sample counts
+     - The override is logged in the sampling results cache
+
+   No additional approval step is needed — overrides take effect immediately.

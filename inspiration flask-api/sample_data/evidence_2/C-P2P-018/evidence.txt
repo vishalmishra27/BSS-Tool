@@ -1,0 +1,12 @@
+Sample ID: S1
+Source Document: SAP Aging Report W/E 2024-05-24 / Email Trail
+Test Date: 2024-06-21
+Tested By: Auditor - Amit Verma
+
+Weekly aging report for W/E 2024-05-24. 38 invoices in queue.
+3 flagged "Due within 3 days" (red). 1 with early payment discount available.
+AP Manager Lakshmi Pillai reviewed on Friday 2024-05-24.
+Prioritized 3 urgent invoices. Approved early payment to capture 2% discount.
+Review documented via email (on file). No formal sign-off on report itself.
+Auto-generated every Monday 7:00 AM. Emailed to AP Manager and Treasury Manager.
+Lakshmi reviews "every Monday, sometimes Tuesday if busy."

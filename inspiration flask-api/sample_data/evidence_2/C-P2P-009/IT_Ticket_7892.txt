@@ -1,0 +1,26 @@
+IT SERVICE DESK — TICKET #IT-7892
+Status: CLOSED | Priority: HIGH | Category: Access Management
+
+Requested By: Rahul Nair (Senior Buyer)
+Date Opened: 2024-05-01 09:15 AM
+Date Closed: 2024-05-01 09:45 AM
+
+REQUEST:
+  Deepa Menon (Procurement Manager) is on leave until 2024-05-06.
+  Need temporary PO_APPROVE role to approve urgent purchase orders.
+
+ACTIONS:
+  09:30 AM — IT Admin Sunil Patel granted PO_APPROVE role to user RNAIR
+  09:45 AM — Ticket closed. Role granted.
+
+APPROVALS:
+  IT Admin: Sunil Patel ✓
+  Business Manager: (NOT OBTAINED)
+  IT Manager: (NOT OBTAINED)
+
+NOTES:
+  - Temporary access. To be revoked after Deepa returns.
+  - Role revoked: 2024-05-07 08:00 AM (automated expiry)
+
+AUDIT FLAG: User RNAIR now has both PO_CREATE and PO_APPROVE.
+  SoD conflict alert: NOT TRIGGERED (no automated SoD monitoring for temp roles)

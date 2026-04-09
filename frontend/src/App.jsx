@@ -3,7 +3,6 @@ import { BrowserRouter, Routes, Route, NavLink, useLocation } from 'react-router
 import { LoadingProvider } from './context/LoadingContext';
 import { SidebarProvider, useSidebar } from './context/SidebarContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import AgentChatWidget from './components/AgentChatWidget';
 
 // Pages
 import LoginPage from './pages/LoginPage';
@@ -32,6 +31,9 @@ import CrudAgentPage from './pages/CrudAgentPage';
 import ReconciliationAgentPage from './pages/ReconciliationAgentPage';
 import OcrAgentPage from './pages/OcrAgentPage';
 import DataManagementAgentPage from './pages/DataManagementAgentPage';
+import UATDashboardPage from './pages/UATDashboardPage';
+import AgentChatPage from './pages/AgentChatPage';
+import AgentDescriptionsPage from './pages/AgentDescriptionsPage';
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 const IconDashboard = () => (
@@ -113,12 +115,10 @@ const ALL_NAV_ITEMS = [
   { label: 'BPM',       path: '/bpm',       icon: <IconBPM />,      module: 'dashboard', dot: true },
   { label: 'Migration', path: '/migration', icon: <IconMigration />,module: 'dashboard', dot: true },
   {
-    label: 'AI Agents', path: '/agent/crud', icon: <IconAgent />, module: 'dashboard',
+    label: 'AI Agents', path: '/agent', icon: <IconAgent />, module: 'dashboard',
     children: [
-      { label: 'Data Management', path: '/agent/data' },
-      { label: 'CRUD Operations', path: '/agent/crud' },
-      { label: 'Reconciliation', path: '/agent/reconciliation' },
-      { label: 'Document Analysis', path: '/agent/ocr' },
+      { label: 'Agent Chat', path: '/agent' },
+      { label: 'Agent Descriptions', path: '/agent/about' },
     ],
   },
   { label: 'Audit Log', path: '/audit-log', icon: <IconAudit />,    module: 'audit_log' },
@@ -231,7 +231,7 @@ function AppLayout({ onLogout }) {
           <Route path="/status"            element={<StatusTrackerPage />} />
           <Route path="/reconciliation"    element={<DashboardPage />} />
           <Route path="/product-dashboard" element={<ProductDashboardPage />} />
-          <Route path="/uat"               element={<ReconciliationDashboardPage />} />
+          <Route path="/uat"               element={<UATDashboardPage />} />
           <Route path="/workflow"          element={<WorkflowTrackerPage readOnly={isReadOnly()} canAssign={can('workflow_assign')} canComment={can('workflow_comment')} canUpload={can('workflow_upload')} />} />
           <Route path="/bpm"               element={<Bpm />} />
           <Route path="/migration"         element={<Summary />} />
@@ -245,6 +245,8 @@ function AppLayout({ onLogout }) {
           <Route path="/flowchart"         element={<Flowchart />} />
           <Route path="/lob/:lob"          element={<TransformationLOBPage />} />
           <Route path="/testcase/:id"      element={<TestcaseDetailPage />} />
+          <Route path="/agent"                 element={<OcrAgentPage />} />
+          <Route path="/agent/about"            element={<AgentDescriptionsPage />} />
           <Route path="/agent/data"           element={<DataManagementAgentPage />} />
           <Route path="/agent/crud"          element={<CrudAgentPage />} />
           <Route path="/agent/reconciliation" element={<ReconciliationAgentPage />} />
@@ -252,11 +254,6 @@ function AppLayout({ onLogout }) {
           <Route path="/audit-log"         element={<AuditLogPage />} />
         </Routes>
       </main>
-      <AgentChatWidget
-        username={auth?.user?.full_name || 'Programme User'}
-        canUseAgent={can('can_use_agent')}
-        canBulk={can('agent_bulk')}
-      />
     </div>
   );
 }

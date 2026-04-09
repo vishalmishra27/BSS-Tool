@@ -1,0 +1,16 @@
+trigger: "Delete or remove rows where a column equals a value, filter out rows, remove matching entries"
+title: "Delete Rows by Condition"
+steps:
+  - "Simple condition: modify_rcm(action='delete_rows', condition_column='<col>', condition_value='<val>')"
+  - "Complex condition: modify_rcm(action='delete_rows', query_expr='`Column Name` == \"value\"')"
+  - "Verify deletion with inspect_dataframe(mode='info') to check row count"
+  - "Save checkpoint with save_excel(step_name='after_deletion')"
+notes:
+  - "For column names with spaces, wrap in backticks in query_expr: `Column Name`"
+  - "This PERMANENTLY removes rows — consider saving a checkpoint with save_excel BEFORE deleting"
+  - "condition_column matching is case-insensitive and whitespace-trimmed"
+  - "query_expr supports pandas syntax: ==, !=, >, <, &, |"
+tags:
+  - modify
+  - delete
+  - filter

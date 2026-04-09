@@ -1,0 +1,142 @@
+AGENT FLOW EXAMPLE (RCM UNIVERSE PRESERVATION)
+================================================
+
+Purpose
+-------
+This example shows how the autonomous agent runs TOD -> TOE while preserving the full RCM universe.
+No control is dropped from outputs, even when evidence is missing.
+
+Example Input
+-------------
+RCM controls:
+  C-P2P-001
+  C-P2P-002
+  C-P2P-003
+  C-P2P-004
+
+TOD evidence folder contains:
+  C-P2P-001/  (present)
+  C-P2P-002/  (present)
+  C-P2P-003/  (missing)
+  C-P2P-004/  (present)
+
+TOE evidence folder contains:
+  C-P2P-001/  (present)
+  C-P2P-002/  (present)
+  C-P2P-003/  (present)
+  C-P2P-004/  (present)
+
+Assume TOD outcomes:
+  C-P2P-001 -> PASS
+  C-P2P-002 -> FAIL
+  C-P2P-003 -> NO EVIDENCE (folder missing)
+  C-P2P-004 -> PASS
+
+
+1) Agent TOD Step
+-----------------
+Tool path:
+  agent/tools/test_of_design.py
+
+What happens:
+  - Agent loads TOD evidence.
+  - Runs test_all_tod(...).
+  - Engine evaluates controls with evidence.
+  - Engine appends placeholder result for missing evidence controls.
+
+TOD result list returned to agent state (state.tod_results):
+  C-P2P-001: PASS
+  C-P2P-002: FAIL
+  C-P2P-003: NO EVIDENCE
+  C-P2P-004: PASS
+
+Agent summary style:
+  "TOD: 2 PASS, 1 FAIL, 1 No Evidence out of 4 controls (full RCM universe)."
+
+
+2) Agent TOE Step
+-----------------
+Tool path:
+  agent/tools/test_of_effectiveness.py
+
+Important call:
+  test_all_toe(..., tod_results=state.tod_results)
+
+What engine does with tod_results:
+  - If TOD == FAIL      -> skip TOE evaluation, add TOE placeholder: "TOD Failed"
+  - If TOD == NO EVIDENCE -> skip TOE evaluation, add TOE placeholder: "No Evidence"
+  - Else                -> run normal TOE evaluation
+
+So in this example:
+  C-P2P-001: TOE runs normally (has TOE evidence, TOD passed)
+  C-P2P-002: TOE does NOT run -> TOE result = "TOD Failed"
+  C-P2P-003: TOE does NOT run -> TOE result = "No Evidence"
+  C-P2P-004: TOE runs normally
+
+Even though C-P2P-003 has TOE evidence, TOE is still skipped because TOD had no evidence.
+
+
+3) TOE Output Example
+---------------------
+Final TOE controls (still 4 total, no dropping):
+
+  C-P2P-001:
+    operating_effectiveness: Effective
+    deficiency_type: None
+
+  C-P2P-002:
+    operating_effectiveness: TOD Failed
+    deficiency_type: TOD Failed — TOE not required
+    overall_remarks: TOD failed, TOE not performed.
+
+  C-P2P-003:
+    operating_effectiveness: No Evidence
+    deficiency_type: Unable to Assess
+    overall_remarks: No evidence was provided for this control in TOD. TOE was not performed.
+
+  C-P2P-004:
+    operating_effectiveness: Effective with Exceptions
+    deficiency_type: Control Deficiency
+
+Agent summary style:
+  "TOE: 1 Effective, 1 Exceptions, 0 Not Effective, 1 TOD Failed (skipped), 1 No Evidence out of 4 controls (full RCM universe)."
+
+
+4) Workpaper Behavior
+---------------------
+Excel summary sheet:
+  - Contains all 4 controls.
+
+Individual control sheets:
+  - Generated only for evaluated controls.
+  - Not generated for placeholders:
+      operating_effectiveness in ("TOD Failed", "No Evidence")
+
+In this example:
+  - Control sheets created for: C-P2P-001, C-P2P-004
+  - Control sheets skipped for: C-P2P-002, C-P2P-003
+
+
+5) Why This Prevents Logic Breaks
+---------------------------------
+  - No silent control removal.
+  - TOD failure correctly gates TOE.
+  - Missing evidence is explicit and auditable.
+  - Output remains RCM-complete for reviewer traceability.
+
+
+Quick Visual (Pipeline)
+-----------------------
+RCM universe (4 controls)
+        |
+        v
+TOD run -> [PASS / FAIL / NO EVIDENCE for every control]
+        |
+        v
+TOE gate:
+  FAIL in TOD      -> TOE status "TOD Failed"
+  NO EVIDENCE in TOD -> TOE status "No Evidence"
+  PASS in TOD      -> TOE evaluated normally
+        |
+        v
+Final TOE output (4 controls preserved)

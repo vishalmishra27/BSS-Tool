@@ -6,6 +6,22 @@ const SUGGESTIONS = [
   { label: 'Flag discrepancies', icon: '⚠', desc: 'Find inconsistencies across documents' },
 ];
 
+async function readJsonSafely(res) {
+  const contentType = res.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) return null;
+  try {
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+function buildHttpErrorMessage(res, data, fallback) {
+  if (data?.error) return data.error;
+  if (data?.message) return data.message;
+  return `${fallback} (${res.status} ${res.statusText || 'Request failed'})`;
+}
+
 // ── Markdown table renderer ─────────────────────────────────────────────────
 function MarkdownTable({ raw }) {
   const lines = raw.trim().split('\n').filter(l => l.includes('|'));
@@ -201,9 +217,9 @@ export default function OcrAgentPage() {
           file_paths: readableFiles.map(f => ({ name: f.name, path: f.path })),
         }),
       });
-      const data = await res.json();
+      const data = await readJsonSafely(res);
       if (!res.ok) {
-        addMsg('agent', data.error || 'Analysis failed.', { isError: true });
+        addMsg('agent', buildHttpErrorMessage(res, data, 'Analysis failed'), { isError: true });
       } else {
         addMsg('agent', data.answer, {
           docs: data.docs_processed,
@@ -212,10 +228,11 @@ export default function OcrAgentPage() {
           answer: data.answer,
         });
       }
-    } catch {
-      addMsg('agent', 'Network error — could not reach the server.', { isError: true });
+    } catch (err) {
+      addMsg('agent', `Network error — ${err.message || 'could not reach the server.'}`, { isError: true });
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   // ── Batch extract ──────────────────────────────────────────────────────────
@@ -242,9 +259,9 @@ export default function OcrAgentPage() {
           file_paths: readableFiles.map(f => ({ name: f.name, path: f.path })),
         }),
       });
-      const data = await res.json();
+      const data = await readJsonSafely(res);
       if (!res.ok) {
-        addMsg('agent', data.error || 'Batch extract failed.', { isError: true });
+        addMsg('agent', buildHttpErrorMessage(res, data, 'Batch extract failed'), { isError: true });
       } else {
         // Build a markdown table from the result
         const cols = data.columns || [];
@@ -259,10 +276,11 @@ export default function OcrAgentPage() {
           batchFilename: `batch_extract_${Date.now()}.xlsx`,
         });
       }
-    } catch {
-      addMsg('agent', 'Network error.', { isError: true });
+    } catch (err) {
+      addMsg('agent', `Network error — ${err.message || 'request failed.'}`, { isError: true });
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   // ── Reset ─────────────────────────────────────────────────────────────────

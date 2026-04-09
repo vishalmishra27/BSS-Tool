@@ -1,0 +1,18 @@
+trigger: "Run sampling, calculate sample sizes, determine how many samples per control, sampling engine"
+title: "Sampling Engine"
+steps:
+  - "First ensure RCM is loaded with load_rcm"
+  - "Run run_sampling_engine() to calculate sample sizes per control"
+  - "Results are based on Control Frequency and Risk Rating columns"
+  - "After sampling, the Count_of_Samples column is populated in the RCM"
+  - "After sampling, proceed to TOE: preview_toe_attributes then run_test_of_effectiveness"
+notes:
+  - "Requires 'Control Frequency' and 'Risk Rating' columns in the RCM"
+  - "KPMG methodology uses standard lookup tables for sample sizes based on frequency and risk"
+  - "Run sampling AFTER TOD and BEFORE TOE"
+  - "The correct workflow order: TOD → Sampling → TOE"
+  - "If frequencies or risk levels are unrecognized, they default to conservative values"
+tags:
+  - sampling
+  - toe
+  - prerequisite

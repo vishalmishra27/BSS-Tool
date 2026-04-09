@@ -1,0 +1,23 @@
+Collecting azure-storage-blob
+  Downloading azure_storage_blob-12.28.0-py3-none-any.whl.metadata (26 kB)
+Collecting azure-core>=1.30.0 (from azure-storage-blob)
+  Downloading azure_core-1.38.3-py3-none-any.whl.metadata (48 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 48.4/48.4 kB 451.1 kB/s eta 0:00:00
+Requirement already satisfied: cryptography>=2.1.4 in /opt/anaconda3/lib/python3.12/site-packages (from azure-storage-blob) (42.0.5)
+Requirement already satisfied: typing-extensions>=4.6.0 in /opt/anaconda3/lib/python3.12/site-packages (from azure-storage-blob) (4.15.0)
+Collecting isodate>=0.6.1 (from azure-storage-blob)
+  Downloading isodate-0.7.2-py3-none-any.whl.metadata (11 kB)
+Requirement already satisfied: requests>=2.21.0 in /opt/anaconda3/lib/python3.12/site-packages (from azure-core>=1.30.0->azure-storage-blob) (2.32.5)
+Requirement already satisfied: cffi>=1.12 in /opt/anaconda3/lib/python3.12/site-packages (from cryptography>=2.1.4->azure-storage-blob) (1.16.0)
+Requirement already satisfied: pycparser in /opt/anaconda3/lib/python3.12/site-packages (from cffi>=1.12->cryptography>=2.1.4->azure-storage-blob) (2.21)
+Requirement already satisfied: charset_normalizer<4,>=2 in /opt/anaconda3/lib/python3.12/site-packages (from requests>=2.21.0->azure-core>=1.30.0->azure-storage-blob) (2.0.4)
+Requirement already satisfied: idna<4,>=2.5 in /opt/anaconda3/lib/python3.12/site-packages (from requests>=2.21.0->azure-core>=1.30.0->azure-storage-blob) (3.7)
+Requirement already satisfied: urllib3<3,>=1.21.1 in /opt/anaconda3/lib/python3.12/site-packages (from requests>=2.21.0->azure-core>=1.30.0->azure-storage-blob) (1.26.20)
+Requirement already satisfied: certifi>=2017.4.17 in /opt/anaconda3/lib/python3.12/site-packages (from requests>=2.21.0->azure-core>=1.30.0->azure-storage-blob) (2024.7.4)
+Downloading azure_storage_blob-12.28.0-py3-none-any.whl (431 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 431.5/431.5 kB 238.2 kB/s eta 0:00:00
+Downloading azure_core-1.38.3-py3-none-any.whl (218 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 218.2/218.2 kB 575.6 kB/s eta 0:00:00
+Downloading isodate-0.7.2-py3-none-any.whl (22 kB)
+Installing collected packages: isodate, azure-core, azure-storage-blob
+Successfully installed azure-core-1.38.3 azure-storage-blob-12.28.0 isodate-0.7.2

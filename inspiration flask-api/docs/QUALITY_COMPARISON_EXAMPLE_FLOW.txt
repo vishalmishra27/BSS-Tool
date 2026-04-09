@@ -1,0 +1,857 @@
+QUALITY COMPARISON ENGINE — BEHAVIOUR & EXAMPLE CONVERSATION FLOW
+==================================================================
+
+Purpose
+-------
+This document describes the full runtime behaviour of the Quality Comparison
+engine when invoked through the agent, including what happens under the hood
+at each step, what the LLM sees vs what the user sees, and a realistic
+end-to-end example conversation.
+
+
+================================================================================
+ PART 1 — TECHNICAL BEHAVIOUR (what happens under the hood)
+================================================================================
+
+
+1. TOOL DISCOVERY
+-----------------
+The agent loop builds a tool summary from the registry at the start of every
+LLM turn. The QualityComparisonTool is registered under the ANALYSIS category.
+The LLM sees it in its system prompt as:
+
+  [ANALYSIS]
+    - run_quality_comparison: Run a Quality Comparison: autonomously executes
+      the full SOX audit pipeline (TOD with auto-approved schemas -> Sampling
+      -> TOE), then compares our tool's results against a human auditor's
+      pre-existing workpapers. Produces a comparison report identifying gaps
+      in the human's work at three levels: per-control verdict, per-attribute,
+      and per-sample. Requires a single project folder containing subfolders:
+      RCM/ (with the RCM Excel), evidence/TOD/ and evidence/TOE/ (with
+      Control ID subfolders), and OutputWork/ (with the human workpaper Excel).
+
+The LLM decides to call this tool based on the user's request.
+
+
+2. INPUT: SINGLE PROJECT FOLDER
+--------------------------------
+The tool takes ONE path — a project folder with this structure:
+
+  project_folder/
+  ├── RCM/                         <- contains the RCM Excel file (.xlsx)
+  │   └── RCM_Procure_to_Pay.xlsx
+  ├── evidence/
+  │   ├── TOD/                     <- Control ID subfolders with TOD evidence
+  │   │   ├── C-P2P-001/
+  │   │   │   ├── walkthrough.pdf
+  │   │   │   └── SOP.docx
+  │   │   ├── C-P2P-002/
+  │   │   │   └── narrative.txt
+  │   │   └── ...
+  │   └── TOE/                     <- Control ID subfolders with TOE samples
+  │       ├── C-P2P-001/
+  │       │   ├── sample1/         <- (Mode A) subfolder per sample
+  │       │   │   ├── invoice.pdf
+  │       │   │   └── approval.txt
+  │       │   └── sample2/
+  │       │       └── receipt.pdf
+  │       ├── C-P2P-002/
+  │       │   ├── sample_1.pdf     <- (Mode B) sample-named files
+  │       │   └── sample_2.docx
+  │       └── ...
+  └── OutputWork/
+      ├── TOD/                     <- human auditor's TOD workpaper Excel
+      │   └── Human_TOD_Workpaper.xlsx
+      └── TOE/                     <- human auditor's TOE workpaper Excel
+          └── Human_TOE_Workpaper.xlsx
+
+The tool auto-discovers the Excel files inside RCM/, OutputWork/TOD/, and
+OutputWork/TOE/ (picks the first .xlsx/.xls file found, ignoring Excel temp
+files starting with ~$).
+
+Output is written to project_folder/quality_comparison/.
+
+
+3. TOOL INVOCATION
+------------------
+When the LLM generates a tool call for `run_quality_comparison`, the agent
+loop's executor dispatches to QualityComparisonTool.execute(). The tool
+wrapper (agent/tools/quality_comparison.py) does the following:
+
+  a) Strips quotes/whitespace from the project_folder path
+  b) Validates the project folder exists
+  c) Checks for required subfolders: RCM/, evidence/TOD/, evidence/TOE/,
+     OutputWork/TOD/, OutputWork/TOE/
+     - If any are missing → returns ToolResult(success=False) with a clear
+       error listing the missing subfolders and the expected structure
+  d) Auto-discovers Excel files in RCM/, OutputWork/TOD/, and OutputWork/TOE/
+     - If no Excel found in any → returns ToolResult(success=False) with error
+  e) Sets output_dir to project_folder/quality_comparison/
+  f) Imports and instantiates QualityComparisonEngine with credentials
+     from the agent config (OpenAI or Azure OpenAI)
+  g) Calls engine.run()
+
+
+3. ENGINE PIPELINE (engines/QualityComparison.py — QualityComparisonEngine.run)
+-------------------------------------------------------------------------------
+The engine runs 11 sequential steps. Each step logs to the
+"engines.QualityComparison" logger. The user does NOT see these logs in the
+chat — they appear in the server/console log.
+
+  Step 1:  Load RCM
+           - smart_read_file() auto-detects header row, normalizes columns
+           - If risk_level column is missing, defaults to "High"
+           - Returns normalized_rcm_df + original_rcm_df
+
+  Step 2:  Apply KPMG Sampling
+           - For each control: normalize frequency → lookup KPMG table → count
+           - Automated controls always get count = 1
+           - Unknown frequencies default to "Recurring" (conservative)
+           - Populates rcm_df["count_of_samples"]
+
+  Step 3:  Initialize RCMControlTester
+           - Creates TOD_Engine.RCMControlTester with RCM + credentials
+           - This object holds rcm_lookup (control_id → row) and the LLM evaluator
+
+  Step 4:  Load TOD evidence
+           - load_tod_evidence_folder() reads evidence/TOD/ folder
+           - All files per control subfolder are merged into ONE evidence block
+           - Evidence keys are normalized to match RCM control IDs (case-insensitive)
+           - Raises ValueError if no evidence found
+
+  Step 5:  Generate schemas autonomously
+           - ThreadPoolExecutor(max_workers=5) generates one schema per control
+           - Each schema defines testing attributes (e.g., "Attribute A: Authorization")
+           - NO user approval — schemas are auto-approved (key difference from
+             the interactive agent flow)
+           - Failed schema generations are logged and skipped
+
+  Step 6:  Run Test of Design (TOD)
+           - tester.test_all_tod() evaluates each control's design
+           - 1 sample per control (the merged evidence block from step 4)
+           - Returns tod_results (PASS/FAIL per control) and tod_schemas
+           - Exports QC_TOD_Results.xlsx
+
+  Step 7:  Filter to TOD-PASS controls
+           - Only controls with result == "PASS" proceed to TOE
+           - Controls that FAIL TOD are excluded from further testing
+
+  Step 8:  Load TOE evidence
+           - load_toe_evidence_folder() reads evidence/TOE/ folder (separate from TOD)
+           - Only loads controls in the tod_pass_cids set
+           - Auto-detects sample layout per control (subfolder / named / fallback)
+           - Multiple samples per control
+
+  Step 9:  Run Test of Effectiveness (TOE)
+           - tester.test_all_toe() tests each sample against the schema attributes
+           - Reuses tod_schemas from step 6 for consistency
+           - Derives per-control verdict (Effective / Effective with Exceptions / Not Effective)
+           - Exports QC_TOE_Results.xlsx
+
+  Step 10: Parse human workpapers (TWO files)
+           - HumanWorkpaperParser reads BOTH the human's TOD and TOE Excel workbooks
+           - For each workbook:
+             Sheet 1 (Summary): extracts control IDs, sample counts, effectiveness,
+             deviation rates, deficiency types
+             Sheet 2+ (Per-control): parses attribute legend, testing table with
+             per-sample per-attribute Yes/No results, conclusion banner
+           - Merges per-control data with summary data
+
+  Step 11: Compare results (TWO comparisons)
+           - _compare_controls() runs TWICE:
+             11a: Our TOD results vs human TOD workpaper (phase="TOD")
+             11b: Our TOE results vs human TOE workpaper (phase="TOE")
+           - Both use the same 3-level comparison algorithm:
+             Level 1: Verdict — our effectiveness vs human's (ranked comparison)
+             Level 2: Attributes — fuzzy-matched, flags missed + different results
+             Level 3: Samples — ID-normalized, flags missing + FAIL-vs-PASS differences
+           - _classify_severity() assigns CRITICAL/HIGH/MEDIUM/LOW/NONE per control
+           - Results from both phases are merged into one ComparisonReport
+           - Exports QC_Comparison_Report.xlsx (4 sheets, each with a Phase column)
+
+
+4. TOOL RESULT RETURNED TO LLM
+-------------------------------
+After engine.run() completes, the tool wrapper builds a ToolResult:
+
+  ToolResult(
+    success=True,
+    data={
+      "total_controls": 20,
+      "controls_with_gaps": 7,
+      "severity_breakdown": {"CRITICAL": 1, "HIGH": 2, "MEDIUM": 3, "LOW": 1, "NONE": 13},
+      "top_gaps": [
+        {
+          "control_id": "C-P2P-008",
+          "severity": "CRITICAL",
+          "our_verdict": "Not Effective",
+          "human_verdict": "Effective",
+          "verdict_gap": true,
+          "attributes_missed": ["C", "B", "E"],
+          "samples_missed": 0,
+          "attribute_differences": 2,
+          "sample_differences": 2,
+          "detail": "Our tool assessed 'Not Effective' but human assessed 'Effective' — human may have missed issues"
+        },
+        ... (up to 10 gaps, sorted by severity descending, NONE filtered out)
+      ],
+      "tod_output": "/data/.../quality_comparison/QC_TOD_Results.xlsx",
+      "toe_output": "/data/.../quality_comparison/QC_TOE_Results.xlsx",
+      "comparison_report": "/data/.../quality_comparison/QC_Comparison_Report.xlsx",
+    },
+    artifacts=[
+      "/data/.../quality_comparison/QC_TOD_Results.xlsx",
+      "/data/.../quality_comparison/QC_TOE_Results.xlsx",
+      "/data/.../quality_comparison/QC_Comparison_Report.xlsx",
+    ],
+    summary="Quality Comparison: 20 controls, 7 with gaps (CRITICAL=1, HIGH=2, MEDIUM=3, LOW=1)",
+    duration_seconds=142.5,
+  )
+
+The ComparisonReport object is also cached in state.comparison_results for
+follow-up questions (the LLM can reference it without re-running the engine).
+
+
+5. AGENT LOOP PROCESSES THE RESULT
+-----------------------------------
+The loop (agent/core/loop.py) does:
+
+  a) Serializes result.data as JSON (max 4000 chars, truncated if needed)
+  b) Reflector analyzes the result and may inject _agent_notes
+  c) Result is added to episodic memory via memory.add_tool_result()
+  d) last_tool_name is set to "run_quality_comparison"
+  e) Loop continues → LLM receives the result in the next turn
+
+
+6. LLM GENERATES RESPONSE
+--------------------------
+The LLM sees the full ToolResult data and generates a natural-language summary
+for the user. It typically:
+
+  - Shows a summary table (total controls, gaps by severity)
+  - Lists the top gaps with explanations (CRITICAL first)
+  - Lists the output file paths
+  - Suggests what the user can do next
+
+Because run_quality_comparison is an ANALYSIS tool and does NOT set any of the
+state fields that suggestions.py checks (it doesn't set state.tod_results,
+state.toe_results, state.rcm_df, etc.), the deterministic suggestions system
+does NOT append any "What you can do next" block. The LLM's own suggestions
+are the only ones shown.
+
+This is by design — Quality Comparison is a complete autonomous pipeline that
+doesn't participate in the interactive scoping/TOD/sampling/TOE workflow.
+
+
+7. FOLLOW-UP QUESTIONS
+-----------------------
+When the user asks follow-up questions (e.g., "tell me about C-P2P-008"), the
+LLM uses the cached data from the previous tool result (still in the conversation
+memory) to answer. It does NOT re-run the engine.
+
+The state.comparison_results field preserves the full ComparisonReport object,
+but in practice the LLM relies on the serialized ToolResult data in the
+conversation history rather than accessing state directly.
+
+
+8. ERROR SCENARIOS
+------------------
+If the engine fails at any step, the behaviour is:
+
+  a) Missing/invalid paths:
+     Tool returns ToolResult(success=False, error="RCM path not found at: ...")
+     The LLM tells the user the path is wrong and asks for the correct one.
+
+  b) No evidence found:
+     Engine raises ValueError("No evidence found in ...")
+     Tool catches it and returns ToolResult(success=False, error="Quality Comparison failed: ...")
+     The LLM explains the error and asks the user to check the evidence folder structure.
+
+  c) Schema generation fails for some controls:
+     Logged as errors, those controls are skipped. The pipeline continues with
+     the controls that succeeded. The final report only covers controls that
+     made it through the pipeline.
+
+  d) All controls fail TOD:
+     tod_pass_cids is empty. TOE evidence loading finds nothing. TOE runs on
+     0 controls. The comparison report shows 0 comparisons with total_controls
+     set to len(rcm_df). The LLM would report that all controls failed TOD
+     and no comparison was possible.
+
+  e) Human workpaper has no parseable sheets:
+     HumanWorkpaperParser returns empty dict. All controls show as
+     "NOT FOUND" in the comparison. Severity is HIGH for non-Effective,
+     LOW for Effective.
+
+
+================================================================================
+ PART 2 — EXAMPLE CONVERSATION (what the user sees)
+================================================================================
+
+
+Assumptions
+-----------
+- Project folder:  /data/audit_2025/ (20 controls)
+  /data/audit_2025/
+  ├── RCM/
+  │   └── RCM_Procure_to_Pay.xlsx
+  ├── evidence/
+  │   ├── TOD/     (18 control subfolders with design evidence)
+  │   └── TOE/     (18 control subfolders with effectiveness samples)
+  └── OutputWork/
+      ├── TOD/
+      │   └── Human_TOD_Workpaper.xlsx
+      └── TOE/
+          └── Human_TOE_Workpaper.xlsx
+
+
+────────────────────────────────────────────────────────────────────────────────
+USER:
+────────────────────────────────────────────────────────────────────────────────
+
+Run the quality comparison on my P2P audit data at /data/audit_2025/
+
+
+────────────────────────────────────────────────────────────────────────────────
+AGENT (what the user sees):
+────────────────────────────────────────────────────────────────────────────────
+
+Starting the Quality Comparison. This will:
+
+1. Load your RCM and apply KPMG sampling
+2. Run **Test of Design** (TOD) autonomously with auto-generated schemas
+3. Run **Test of Effectiveness** (TOE) on controls that pass TOD
+4. Parse the human team's workpaper
+5. Compare our results against theirs and flag gaps
+
+This may take a few minutes depending on the number of controls and evidence
+volume. Running now...
+
+  [Tool call: run_quality_comparison]
+    project_folder:  /data/audit_2025/
+
+
+────────────────────────────────────────────────────────────────────────────────
+UNDER THE HOOD (server logs, not visible to user):
+────────────────────────────────────────────────────────────────────────────────
+
+  INFO  agent.tools.quality_comparison  Project folder resolved: rcm=/data/audit_2025/RCM/RCM_Procure_to_Pay.xlsx, tod_evidence=/data/audit_2025/evidence/TOD, toe_evidence=/data/audit_2025/evidence/TOE, human_tod=/data/audit_2025/OutputWork/TOD/Human_TOD_Workpaper.xlsx, human_toe=/data/audit_2025/OutputWork/TOE/Human_TOE_Workpaper.xlsx, output=/data/audit_2025/quality_comparison
+  INFO  agent.tools.quality_comparison  Starting Quality Comparison engine
+  INFO  engines.QualityComparison  Step 1: Loading RCM from /data/audit_2025/RCM/RCM_Procure_to_Pay.xlsx
+  INFO  engines.QualityComparison  RCM loaded: 20 rows, 12 columns
+  INFO  engines.QualityComparison  Step 2: Applying KPMG sampling
+  INFO  engines.QualityComparison  Sampling applied: 20 controls, 142 total samples
+  INFO  engines.QualityComparison  Step 3: Initializing RCMControlTester
+  INFO  engines.QualityComparison  Step 4: Loading TOD evidence from /data/audit_2025/evidence/TOD
+  [TOD Evidence Loaded] 18 controls from /data/audit_2025/evidence/TOD
+  [Evidence Files]      47 files across 18 controls
+  [File Formats]        docx: 8, email: 3, image: 6, pdf: 18, text: 12
+    [DIR] C-P2P-001: 3 evidence files
+    [DIR] C-P2P-002: 2 evidence files
+    ...
+  INFO  engines.QualityComparison  TOD evidence: 18 controls, 18 samples
+  INFO  engines.QualityComparison  Step 5: Generating TOD schemas (autonomous, no approval)
+  INFO  engines.QualityComparison  Schema generated for C-P2P-001
+  INFO  engines.QualityComparison  Schema generated for C-P2P-002
+  ...
+  INFO  engines.QualityComparison  Schemas generated for 18 / 18 controls
+  INFO  engines.QualityComparison  Step 6: Running Test of Design
+  INFO  engines.QualityComparison  TOD complete: 18 results, saved to /data/.../QC_TOD_Results.xlsx
+  INFO  engines.QualityComparison  TOD PASS: 15 controls proceed to TOE
+  INFO  engines.QualityComparison  Step 8: Loading TOE evidence from /data/audit_2025/evidence/TOE
+  [TOE Evidence Loaded] 15 controls, 98 total samples from /data/audit_2025/evidence/TOE
+  [Filter]              Parsed controls: 15 | Skipped by filter: 3
+  INFO  engines.QualityComparison  TOE evidence: 15 controls, 98 samples
+  INFO  engines.QualityComparison  Step 9: Running Test of Effectiveness
+  INFO  engines.QualityComparison  TOE complete: 15 results, saved to /data/.../QC_TOE_Results.xlsx
+  INFO  engines.QualityComparison  Step 10a: Parsing human TOD workpaper from /data/audit_2025/OutputWork/TOD/Human_TOD_Workpaper.xlsx
+  INFO  engines.QualityComparison  Human TOD workpaper: 18 controls parsed
+  INFO  engines.QualityComparison  Step 10b: Parsing human TOE workpaper from /data/audit_2025/OutputWork/TOE/Human_TOE_Workpaper.xlsx
+  INFO  engines.QualityComparison  Human TOE workpaper: 18 controls parsed
+  INFO  engines.QualityComparison  Step 11a: Comparing TOD results
+  INFO  engines.QualityComparison  Step 11b: Comparing TOE results
+  INFO  engines.QualityComparison  Quality Comparison complete: 20 controls, 7 with gaps (CRITICAL=1, HIGH=2, MEDIUM=3, LOW=1)
+
+
+────────────────────────────────────────────────────────────────────────────────
+TOOL RESULT (what the LLM receives as JSON, not visible to user):
+────────────────────────────────────────────────────────────────────────────────
+
+  {
+    "total_controls": 20,
+    "controls_with_gaps": 7,
+    "severity_breakdown": {"CRITICAL": 1, "HIGH": 2, "MEDIUM": 3, "LOW": 1, "NONE": 13},
+    "top_gaps": [
+      {
+        "control_id": "C-P2P-008",
+        "severity": "CRITICAL",
+        "our_verdict": "Not Effective",
+        "human_verdict": "Effective",
+        "verdict_gap": true,
+        "attributes_missed": ["C", "B", "E"],
+        "samples_missed": 0,
+        "attribute_differences": 2,
+        "sample_differences": 2,
+        "detail": "Our tool assessed 'Not Effective' but human assessed 'Effective' — human may have missed issues"
+      },
+      {
+        "control_id": "C-P2P-006",
+        "severity": "HIGH",
+        "our_verdict": "Effective with Exceptions",
+        "human_verdict": "Effective",
+        "verdict_gap": true,
+        "attributes_missed": ["D"],
+        "samples_missed": 0,
+        "attribute_differences": 1,
+        "sample_differences": 0,
+        "detail": "Our tool assessed 'Effective with Exceptions' but human assessed 'Effective' — human may have missed issues"
+      },
+      {
+        "control_id": "C-P2P-014",
+        "severity": "HIGH",
+        "our_verdict": "Effective with Exceptions",
+        "human_verdict": "Effective",
+        "verdict_gap": true,
+        "attributes_missed": ["D", "E"],
+        "samples_missed": 1,
+        "attribute_differences": 0,
+        "sample_differences": 2,
+        "detail": "Our tool assessed 'Effective with Exceptions' but human assessed 'Effective' — human may have missed issues"
+      },
+      {
+        "control_id": "C-P2P-003",
+        "severity": "MEDIUM",
+        "our_verdict": "Effective",
+        "human_verdict": "Effective",
+        "verdict_gap": false,
+        "attributes_missed": ["C", "D"],
+        "samples_missed": 0,
+        "attribute_differences": 0,
+        "sample_differences": 0
+      },
+      {
+        "control_id": "C-P2P-011",
+        "severity": "MEDIUM",
+        "our_verdict": "Effective",
+        "human_verdict": "Effective",
+        "verdict_gap": false,
+        "attributes_missed": [],
+        "samples_missed": 1,
+        "attribute_differences": 1,
+        "sample_differences": 0
+      },
+      {
+        "control_id": "C-P2P-017",
+        "severity": "MEDIUM",
+        "our_verdict": "Effective",
+        "human_verdict": "Effective",
+        "verdict_gap": false,
+        "attributes_missed": [],
+        "samples_missed": 0,
+        "attribute_differences": 1,
+        "sample_differences": 0
+      },
+      {
+        "control_id": "C-P2P-019",
+        "severity": "LOW",
+        "our_verdict": "Effective",
+        "human_verdict": "Effective",
+        "verdict_gap": false,
+        "attributes_missed": [],
+        "samples_missed": 2,
+        "attribute_differences": 0,
+        "sample_differences": 0
+      }
+    ],
+    "project_folder": "/data/audit_2025/",
+    "tod_output": "/data/audit_2025/quality_comparison/QC_TOD_Results.xlsx",
+    "toe_output": "/data/audit_2025/quality_comparison/QC_TOE_Results.xlsx",
+    "comparison_report": "/data/audit_2025/quality_comparison/QC_Comparison_Report.xlsx"
+  }
+
+
+────────────────────────────────────────────────────────────────────────────────
+AGENT (what the user sees — LLM's natural-language presentation):
+────────────────────────────────────────────────────────────────────────────────
+
+**Quality Comparison complete.**
+
+| Metric                  | Count |
+|-------------------------|-------|
+| Total controls (RCM)    | 20    |
+| Controls compared (TOE) | 15    |
+| Controls with gaps      | 7     |
+| CRITICAL gaps           | 1     |
+| HIGH gaps               | 2     |
+| MEDIUM gaps             | 3     |
+| LOW gaps                | 1     |
+| No gaps (NONE)          | 8     |
+
+Note: 3 controls failed TOD (design not adequate) and 2 had no evidence,
+so 15 controls were compared against the human workpaper. Total controls
+in the report reflects all 20 from the RCM.
+
+### Top Gaps Found in Human Workpaper
+
+**CRITICAL — C-P2P-008 (Duplicate PO Detection)**
+Our tool assessed **Not Effective** but human assessed **Effective**.
+- 3 attributes the human didn't test (C, B, E)
+- 2 attribute result differences, 2 sample result differences
+- Human only verified detection exists, not that it blocks duplicate POs
+
+**HIGH — C-P2P-006 (Vendor Screening)**
+Our tool assessed **Effective with Exceptions** but human assessed **Effective**.
+- Human missed Attribute D (Reference Completion)
+- 1 attribute result difference
+
+**HIGH — C-P2P-014 (Three-Way Match)**
+Our tool assessed **Effective with Exceptions** but human assessed **Effective**.
+- Human missed Attributes D and E (Tolerance Threshold, Override Logging)
+- 1 sample missing from human workpaper, 2 sample result differences
+
+**MEDIUM — C-P2P-003, C-P2P-011, C-P2P-017**
+- C-P2P-003: Human missed 2 attributes but verdicts matched
+- C-P2P-011: 1 sample missing, 1 attribute difference
+- C-P2P-017: 1 attribute result difference
+
+**LOW — C-P2P-019**
+- Human tested fewer samples (3 vs 5), same verdict
+
+### Output Files
+
+| File                  | Path                                                          |
+|-----------------------|---------------------------------------------------------------|
+| Our TOD Workpaper     | /data/audit_2025/quality_comparison/QC_TOD_Results.xlsx       |
+| Our TOE Workpaper     | /data/audit_2025/quality_comparison/QC_TOE_Results.xlsx       |
+| **Comparison Report** | /data/audit_2025/quality_comparison/QC_Comparison_Report.xlsx |
+
+The comparison report Excel has 4 sheets:
+- **Executive Summary** — severity breakdown and top-line stats
+- **Control-Level Gaps** — per-control verdict comparison with severity
+- **Attribute Gaps** — every attribute the human missed or got wrong
+- **Sample Gaps** — every sample the human missed or where results differ
+
+Would you like me to deep-dive into any specific gap, or summarize the
+findings for the audit committee?
+
+
+────────────────────────────────────────────────────────────────────────────────
+USER:
+────────────────────────────────────────────────────────────────────────────────
+
+Tell me more about the C-P2P-008 critical gap. What exactly did the human miss?
+
+
+────────────────────────────────────────────────────────────────────────────────
+AGENT (no tool call — answers from cached data in conversation memory):
+────────────────────────────────────────────────────────────────────────────────
+
+Here's the full breakdown for **C-P2P-008 — Duplicate Purchase Order Detection**:
+
+### Control Description
+> Before a new Purchase Order is created, the system checks for duplicate POs
+> to the same vendor within a 30-day window. If a potential duplicate is
+> detected, a warning is raised and the PO must be reviewed by procurement
+> before proceeding.
+
+### Our Tool's Assessment
+
+**Verdict: Not Effective (Material Weakness)**
+- Deviation rate: **40%** (2 out of 5 samples FAILED)
+- Deficiency type: Material Weakness (>20% deviation)
+
+**Attributes tested (5):**
+
+| Attr | Name                        | Result |
+|------|-----------------------------|--------|
+| A    | Duplicate Detection Trigger | 5/5 PASS — system did flag duplicates |
+| B    | Review by Procurement       | 4/5 PASS — 1 sample had no reviewer sign-off |
+| C    | Blocking vs. Warning        | 2/5 PASS — in 3 cases the warning was bypassed without review |
+| D    | 30-Day Window Accuracy      | 5/5 PASS |
+| E    | Documentation of Override   | 3/5 PASS — 2 bypasses had no documented justification |
+
+**Failed samples:**
+- **S2 (PO-88955):** Duplicate PO for vendor Acme Industrial ($22,000).
+  Warning appeared but was dismissed. No reviewer sign-off. No override
+  justification documented. Attributes B, C, E all FAIL.
+- **S4 (PO-89201):** Duplicate PO for vendor Zenith Logistics ($8,500).
+  Warning bypassed. Override logged but no justification text. Attribute C, E FAIL.
+
+### Human Team's Assessment
+
+**Verdict: Effective (No Deficiency)**
+- All 5 samples marked as PASS
+- Only tested **2 attributes**: A (Detection Trigger) and D (Window Accuracy)
+- **Did NOT test**: Attribute C (Blocking vs. Warning), Attribute B (Reviewer
+  Sign-off), or Attribute E (Override Documentation)
+
+### Gap Analysis
+
+| Gap Type             | Detail                                                        |
+|----------------------|---------------------------------------------------------------|
+| **Verdict mismatch** | Our: Not Effective → Human: Effective                         |
+| **Attributes missed**| Human skipped C, B, E (3 out of 5 attributes not tested)     |
+| **Sample S2**        | Our: FAIL (3 attrs) → Human: PASS                            |
+| **Sample S4**        | Our: FAIL (2 attrs) → Human: PASS                            |
+| **Root cause**       | Human only verified the system detects duplicates (it does).  |
+|                      | But they didn't test whether the detection actually *blocks*  |
+|                      | the PO or just shows a dismissible warning — which is the    |
+|                      | critical control gap.                                         |
+
+**Severity: CRITICAL** — The human auditor concluded the control is effective
+because the system does detect duplicates. But our tool identified that the
+detection is a non-blocking warning that can be dismissed without review or
+documentation, which means the control does not actually prevent duplicate POs.
+
+Would you like me to summarize the HIGH-severity gaps, or prepare an
+audit committee summary?
+
+
+────────────────────────────────────────────────────────────────────────────────
+USER:
+────────────────────────────────────────────────────────────────────────────────
+
+Give me a quick summary I can share with the audit committee.
+
+
+────────────────────────────────────────────────────────────────────────────────
+AGENT (no tool call — synthesizes from cached data):
+────────────────────────────────────────────────────────────────────────────────
+
+### Quality Comparison Summary — Procure-to-Pay Audit (FY2025)
+
+**Scope:** 20 controls in the Procure-to-Pay process, compared our automated
+SOX audit tool's results against the internal audit team's workpapers.
+
+---
+
+**Key Findings:**
+
+1. **1 Critical Gap (C-P2P-008):** The Duplicate PO Detection control was
+   assessed as "Effective" by the audit team, but our tool identified it as
+   "Not Effective" with a Material Weakness. The system raises a non-blocking
+   warning that can be dismissed without review — the audit team verified
+   detection exists but did not test enforcement. Deviation rate: 40%.
+
+2. **2 High-Severity Gaps (C-P2P-006, C-P2P-014):** Both controls were assessed
+   as "Effective" by the audit team but our tool found exceptions:
+   - Vendor Screening: incomplete reference checks on 1 vendor
+   - Three-Way Match: tolerance threshold overrides not tested, 1 unapproved
+     override found
+
+3. **3 Medium Gaps:** Attribute coverage differences — the audit team's
+   workpapers tested fewer attributes on 3 controls. Same verdicts in 2 cases,
+   1 minor attribute result difference.
+
+4. **1 Low Gap:** Sample size difference on 1 control (3 vs. 5 samples tested).
+
+5. **13 controls showed no gaps** — the audit team's work was consistent with
+   our automated findings.
+
+---
+
+**Overall Assessment:**
+
+The automated tool tested an average of 4.2 attributes per control compared
+to the audit team's 2.8 attributes per control. The most significant gaps
+were in testing the *enforcement* of controls (blocking vs. warning, override
+documentation) rather than the *existence* of controls. The audit team
+consistently verified that controls exist and trigger correctly, but in 3 cases
+did not validate that the controls cannot be bypassed without proper
+authorization and documentation.
+
+---
+
+**Recommendation:**
+
+- Remediate C-P2P-008 immediately (Material Weakness — duplicate PO detection
+  must be changed from warning to blocking, or a compensating review control
+  must be formalized).
+- Expand the audit team's testing scope to include override/bypass attributes
+  on all IT-dependent controls.
+- Re-test C-P2P-006 and C-P2P-014 with the broader attribute set.
+
+---
+
+**Files:**
+- Full comparison report: QC_Comparison_Report.xlsx
+- Our TOD workpaper: QC_TOD_Results.xlsx
+- Our TOE workpaper: QC_TOE_Results.xlsx
+
+
+================================================================================
+ PART 3 — EDGE CASE BEHAVIOUR
+================================================================================
+
+
+SCENARIO: User provides wrong path
+-----------------------------------
+USER: Run quality comparison on /wrong/path/audit/
+
+AGENT (after tool returns success=False):
+  The project folder was not found at /wrong/path/audit/. Could you
+  double-check the path?
+
+
+SCENARIO: Missing subfolders
+------------------------------
+USER: Run quality comparison on /data/audit_2025/
+
+(But the folder only has RCM/ and evidence/ — no OutputWork/)
+
+AGENT (after tool returns success=False):
+  The project folder at /data/audit_2025/ is missing required subfolders:
+  OutputWork/. The expected structure is:
+
+    RCM/              (contains the RCM Excel file)
+    evidence/TOD/     (Control ID subfolders with TOD evidence)
+    evidence/TOE/     (Control ID subfolders with TOE evidence)
+    OutputWork/       (contains the human workpaper Excel)
+
+  Could you verify the folder structure?
+
+
+SCENARIO: No Excel file in RCM/ folder
+-----------------------------------------
+USER: Run quality comparison on /data/audit_2025/
+
+(RCM/ subfolder exists but is empty or only has non-Excel files)
+
+AGENT:
+  No Excel file was found in /data/audit_2025/RCM/. The RCM/ subfolder
+  must contain an .xlsx or .xls file with the Risk Control Matrix.
+
+
+SCENARIO: No evidence for any control
+--------------------------------------
+USER: Run quality comparison on /data/audit_2025/
+
+(evidence/TOD/ exists but has no control subfolders)
+
+UNDER THE HOOD: Engine raises ValueError("No evidence found in .../evidence/TOD/")
+Tool catches it and returns ToolResult(success=False)
+
+AGENT:
+  The Quality Comparison failed because no evidence was found in
+  /data/audit_2025/evidence/TOD/. The TOD evidence folder should contain
+  subfolders named by Control ID (e.g., C-P2P-001/), each containing
+  evidence files (PDFs, documents, images, etc.).
+
+
+SCENARIO: All controls fail TOD
+---------------------------------
+USER: Run quality comparison on /data/audit_2025/
+
+UNDER THE HOOD:
+  - TOD runs on 18 controls, all FAIL
+  - tod_pass_cids is empty
+  - TOE evidence loading from evidence/TOE/ returns empty dict
+  - TOE runs on 0 controls
+  - Comparison report: 0 comparisons, total_controls = 20 (from RCM)
+
+AGENT:
+  Quality Comparison completed, but all 18 controls with evidence failed the
+  Test of Design. This means no controls proceeded to the Test of Effectiveness,
+  so there are no results to compare against the human workpaper.
+
+  This suggests fundamental design issues with the controls. The human
+  workpaper's results may need to be re-evaluated as well.
+
+  Output files:
+  - TOD results: QC_TOD_Results.xlsx (all FAIL)
+  - Comparison report: QC_Comparison_Report.xlsx (empty — no TOE data)
+
+
+SCENARIO: Human workpaper has unparseable format
+-------------------------------------------------
+USER: Run quality comparison on /data/audit_2025/
+
+(OutputWork/ has an Excel file but in an unrecognised format)
+
+UNDER THE HOOD:
+  - HumanWorkpaperParser.parse() returns empty dict (no controls parsed)
+  - All our TOE controls show human = "NOT FOUND"
+  - Severity: HIGH for non-Effective controls, LOW for Effective controls
+
+AGENT:
+  Quality Comparison complete, but I could not parse any controls from the
+  human workpaper. All 15 compared controls show as "NOT FOUND" in the
+  human workpaper.
+
+  This usually means the workpaper format doesn't match the expected structure:
+  - Sheet 1 should be a summary with columns like "Control ID", "Samples Tested",
+    "Passed", "Failed", "Deviation Rate", etc.
+  - Sheets 2+ should be named by Control ID with testing tables and conclusion banners
+
+  Could you verify the workpaper format?
+
+
+SCENARIO: User doesn't provide project folder
+-----------------------------------------------
+USER: Run the quality comparison.
+
+AGENT (tool returns success=False with awaiting_input):
+  I need the path to your project folder. It should contain:
+
+    RCM/              (with the RCM Excel file)
+    evidence/TOD/     (Control ID subfolders with TOD evidence)
+    evidence/TOE/     (Control ID subfolders with TOE samples)
+    OutputWork/       (with the human auditor's workpaper Excel)
+
+  What's the path to your project folder?
+
+
+================================================================================
+ PART 4 — NOTES ON SUGGESTIONS BEHAVIOUR
+================================================================================
+
+The Quality Comparison tool does NOT trigger any deterministic suggestions
+from suggestions.py. Here's why:
+
+1. The tool sets state.comparison_results, but suggestions.py does not check
+   this field.
+
+2. The tool does NOT set state.tod_results, state.toe_results, state.rcm_df,
+   or any other fields that suggestions.py checks.
+
+3. Quality Comparison is a complete autonomous pipeline — it doesn't need
+   intermediate "What you can do next" prompts because the user doesn't make
+   decisions between steps.
+
+4. The LLM generates its own contextual suggestions (e.g., "deep dive on
+   critical gap", "prepare audit committee summary") based on the results.
+
+This means:
+- No "What you can do next:" block is appended to the agent's response
+- The LLM's own suggestions appear as-is (not stripped by _strip_llm_suggestions)
+- The user sees a natural conversational flow without deterministic buttons
+
+
+================================================================================
+ PART 5 — SEVERITY CLASSIFICATION REFERENCE
+================================================================================
+
+  CRITICAL
+    Trigger:  Our verdict = "Not Effective" AND human verdict = "Effective"
+    Meaning:  Human missed a material control failure.
+
+  HIGH
+    Trigger:  Verdict mismatch where our rank > human rank (e.g., Effective
+              with Exceptions vs Effective), OR 3+ total differences
+              (missed attributes + attribute differences + sample differences),
+              OR control NOT FOUND in human workpaper with non-Effective verdict.
+    Meaning:  Significant gap in the human's testing scope or conclusions.
+
+  MEDIUM
+    Trigger:  Human missed some attributes, OR 1-2 attribute/sample differences.
+    Meaning:  Partial gap in testing coverage, but verdicts may still match.
+
+  LOW
+    Trigger:  Our sample count > human's (with human > 0), OR control NOT FOUND
+              but our verdict is Effective, OR verdict gap with unknown/unparseable
+              ranks, OR human missed some samples.
+    Meaning:  Minor difference, unlikely to change audit conclusions.
+
+  NONE
+    Trigger:  No gaps detected at any level.
+    Meaning:  Human's work is consistent with our automated findings.

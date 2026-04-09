@@ -1,0 +1,10 @@
+Sample ID: S1
+Source Document: PAY-2024-W20 / Payment Gateway Log / Test Screenshots
+Test Date: 2024-06-21
+Tested By: Auditor - Priya Nair
+
+Payment $22,400 to Acme (V-10050). Banking details matched vendor master.
+Tested fictitious vendor TEST-99999 — gateway rejected: "Payee not found."
+Tested mismatched bank details — gateway flagged and blocked payment.
+Vendor master is single source of truth. No manual bank entry at payment stage.
+All rejections logged with timestamp and reason.

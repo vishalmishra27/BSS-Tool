@@ -1,0 +1,14 @@
+Sample ID: S1
+Source Document: PR-20240315 / PO-88431
+Test Date: 2024-06-10
+Tested By: Auditor - Priya Nair
+
+Purchase Requisition PR-20240315 for $12,500 submitted by Analyst Ravi Mehta on 2024-03-15.
+Requisition for 20 laptops (IT equipment).
+First approval by Department Head Sneha Kapoor — 2024-03-15 at 10:32 AM in SAP workflow.
+Second approval by Finance Manager Anil Deshmukh — 2024-03-15 at 11:15 AM in SAP workflow.
+Both approval stamps visible in SAP workflow history with user IDs and timestamps.
+PR converted to PO #PO-88431 on 2024-03-16 only after both approvals completed.
+SAP config confirmed: PRs >= $5,000 require two approval steps (see SAP_Config_Export.txt).
+Also tested a sub-threshold PR ($4,800) — only Department Head approval triggered, confirming threshold logic.
+Written SOP referenced: "Procurement Approval SOP v1.2" (see attached).

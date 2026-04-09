@@ -1,0 +1,16 @@
+trigger: "Change or update values in a column where another column matches a condition, set column value based on filter"
+title: "Conditional Column Update"
+steps:
+  - "Use modify_rcm with action='update_values', column_name='<target_column>', value='<new_value>', condition_column='<filter_column>', condition_value='<filter_value>'"
+  - "Example: modify_rcm(action='update_values', column_name='Count_of_Samples', value='1', condition_column='Control Type', condition_value='Automated')"
+  - "After update, call inspect_dataframe(mode='head') to verify the changes"
+  - "Save checkpoint with save_excel(step_name='after_update')"
+notes:
+  - "Matching is case-insensitive and whitespace-trimmed automatically"
+  - "If column_name doesn't exist, the tool returns available columns — use the exact name from that list"
+  - "If no condition_column is specified, ALL rows are updated"
+  - "The value parameter is always a string — numeric values should be passed as strings like '1' or '100'"
+tags:
+  - modify
+  - conditional
+  - update

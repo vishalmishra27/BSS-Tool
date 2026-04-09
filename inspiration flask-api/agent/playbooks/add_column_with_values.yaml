@@ -1,0 +1,15 @@
+trigger: "Add a new column to the RCM, create a column with default values, insert new field"
+title: "Add New Column"
+steps:
+  - "Use modify_rcm(action='add_column', column_name='New Column Name', value='default_value')"
+  - "To set different values per row, follow up with update_values using conditions"
+  - "Example: modify_rcm(action='add_column', column_name='Review Status', value='Pending')"
+  - "Then: modify_rcm(action='update_values', column_name='Review Status', value='Approved', condition_column='Risk Rating', condition_value='Low')"
+notes:
+  - "Column name must not already exist — use rename_column to change existing names"
+  - "The value parameter sets the SAME default for ALL rows"
+  - "To add a column with varying values, add with a default then use conditional updates"
+tags:
+  - modify
+  - add
+  - column

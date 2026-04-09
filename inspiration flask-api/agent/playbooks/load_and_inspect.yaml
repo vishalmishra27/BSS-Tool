@@ -1,0 +1,14 @@
+trigger: "Load an Excel file, open RCM, read spreadsheet, import data, open a file"
+title: "Load and Inspect RCM"
+steps:
+  - "Use load_rcm(file_path='<path>') — supports .xlsx, .xls, .csv"
+  - "Then inspect_dataframe(mode='info') for shape, column names, and data types"
+  - "Then inspect_dataframe(mode='head') to see the first rows of data"
+notes:
+  - "If user provides a relative or unclear path, use list_directory to find the exact file first"
+  - "load_rcm replaces any previously loaded DataFrame"
+  - "The file path must be an absolute path on the server"
+tags:
+  - load
+  - inspect
+  - start

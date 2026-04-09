@@ -1,0 +1,15 @@
+Sample ID: S1
+Source Document: Q1-2024 Vendor Review Workpaper / Call Logs
+Test Date: 2024-06-12
+Tested By: Auditor - Sanjay Kulkarni
+
+Q1 2024 vendor master data review performed by Vendor Management team.
+IT generated full extract of 342 active vendor records from SAP on 2024-04-01.
+Review completed by Vendor Analyst Kavita Sharma and Vendor Management Lead Arjun Reddy
+on 2024-04-08 (8 business days after quarter-end).
+Findings: 5 address corrections, 2 banking detail changes verified via call-back,
+1 duplicate vendor record merged (V-10045 / V-10187).
+Workpaper signed off by Arjun Reddy and Deepa Menon (Procurement Mgr).
+Review covers ALL active vendors, not a sample.
+No formal SLA for completion timeline — Arjun said "we aim for 2 weeks after quarter-end."
+Call-back verification procedure documented in attached Vendor_Master_Procedures_v2.1.txt.

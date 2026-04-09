@@ -1,0 +1,95 @@
+================================================================================
+  CUSTOM SAMPLING TABLE — INPUT FORMAT SPECIFICATION
+================================================================================
+
+The custom sampling table replaces the default KPMG sampling methodology.
+It maps each (frequency, risk level) combination to a required sample count.
+
+
+1. ACCEPTED FILE FORMATS
+   - Excel (.xlsx, .xls)
+   - CSV (.csv)
+
+
+2. REQUIRED COLUMNS
+
+   Your file MUST have these three columns (header names are flexible):
+
+   +--------------------------+----------------------------------------------+
+   | Column                   | Description                                  |
+   +--------------------------+----------------------------------------------+
+   | Frequency                | The control frequency category.              |
+   |                          | (e.g., Annual, Monthly, Weekly, Daily, etc.) |
+   +--------------------------+----------------------------------------------+
+   | Risk of Failure (Lower)  | Sample count when risk level is LOW.          |
+   |  or "Lower Risk"         | Must be an integer.                          |
+   +--------------------------+----------------------------------------------+
+   | Risk of Failure (Higher) | Sample count when risk level is HIGH.         |
+   |  or "Higher Risk"        | Must be an integer.                          |
+   +--------------------------+----------------------------------------------+
+
+   Column detection is flexible — the system looks for:
+     - A column containing "frequency" in the header
+     - A column containing "lower" in the header  (maps to Low risk)
+     - A column containing "higher" in the header (maps to High risk)
+
+
+3. EXAMPLE EXCEL LAYOUT
+
+   +---------------------------------------------+----------+----------+
+   | Frequency                                   | Lower    | Higher   |
+   |                                             | Risk     | Risk     |
+   +---------------------------------------------+----------+----------+
+   | Annual                                      |    1     |    1     |
+   | Quarterly                                   |    2     |    2     |
+   | Monthly                                     |    2     |    3     |
+   | Weekly                                      |    5     |    8     |
+   | Daily                                       |   15     |   25     |
+   | Recurring (multiple times per day)           |   25     |   40     |
+   +---------------------------------------------+----------+----------+
+
+   NOTE: The frequency labels can be anything you use internally — the system
+   will match RCM control frequencies to these rows using flexible aliases.
+
+
+4. DEFAULT KPMG TABLE (for reference)
+
+   This is the built-in table that is used when you choose "kpmg" methodology:
+
+   Frequency                                Transactions   Lower  Higher
+   -----------------------------------------------------------------------
+   Annual                                   1              1      1
+   Quarterly (including period end, i.e.+1) 2 - 4          2      2
+   Monthly                                  5 - 12         2      3
+   Weekly                                   13 - 52        5      8
+   Daily                                    53 - 365       15     25
+   Recurring (multiple times per day)       Above 365      25     40
+
+
+5. RISK LEVEL MAPPING
+
+   The system normalises all risk levels to either "Low" or "High" for
+   sampling purposes:
+
+     Low, Minimal           -->  Low   (uses "Lower Risk" column)
+     Medium, Moderate       -->  High  (conservative — uses "Higher Risk")
+     High, Critical         -->  High  (uses "Higher Risk" column)
+
+
+6. HOW TO PROVIDE IN CHAT (without Excel)
+
+   If you prefer not to upload an Excel file, you can describe your custom
+   table in chat. For example:
+
+     "Use custom sampling: Annual=1/1, Quarterly=2/3, Monthly=3/5,
+      Weekly=10/15, Daily=20/30, Recurring=30/50"
+
+   Format: Frequency=LowRiskCount/HighRiskCount
+
+   The agent will parse this and use it as your custom table.
+
+
+7. AUTOMATED CONTROL OVERRIDE
+
+   Regardless of the sampling table used, controls with Control Type =
+   "Automated" always get a sample count of 1.

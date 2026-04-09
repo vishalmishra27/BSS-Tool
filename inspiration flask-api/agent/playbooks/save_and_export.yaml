@@ -1,0 +1,13 @@
+trigger: "Save the Excel, export results, checkpoint progress, download file, save work"
+title: "Save Excel Checkpoint"
+steps:
+  - "Use save_excel(step_name='descriptive_name')"
+  - "Example step names: 'after_sampling', 'after_tod', 'final_audit', 'post_update'"
+notes:
+  - "Files are saved to the output directory with version numbers (v1, v2, etc.)"
+  - "Always save after significant modifications to avoid losing work"
+  - "The saved path is returned in the result"
+tags:
+  - save
+  - export
+  - checkpoint

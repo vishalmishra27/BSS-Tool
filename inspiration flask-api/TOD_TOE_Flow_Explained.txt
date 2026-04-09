@@ -1,0 +1,245 @@
+================================================================================
+  TOD → TOE END-TO-END FLOW  —  Evidence Filtering Behavior
+================================================================================
+
+OVERVIEW
+--------
+The system runs two sequential audit phases:
+  1. TOD (Test of Design)    — evaluates whether each control is well-designed
+  2. TOE (Test of Effectiveness) — evaluates whether each control actually operates
+
+The key optimization: TOE only extracts and evaluates evidence for controls that
+PASSED in TOD, since failed designs don't need operating effectiveness testing.
+
+There are TWO code paths that run TOE:
+  A) Flask API endpoints (/api/tod-test, /api/toe-test)  — api.py
+  B) SOX Agent tools (test_of_design, test_of_effectiveness) — agent/tools/
+
+Both paths now filter to TOD-passed controls only.
+
+
+================================================================================
+  PATH A: FLASK API FLOW
+================================================================================
+
+STEP 1: POST /api/tod-test
+─────────────────────────────────────────────────────────────────────────────────
+  File: api.py lines 611–772
+
+  a) Loads TOD evidence for all controls
+  b) Runs TOD evaluation → returns list of TODControlResult (PASS/FAIL/NO EVIDENCE)
+  c) Caches raw results for the TOE endpoint:
+       latest_results['_tod_raw_results'] = results
+       latest_results['_tod_raw_schemas'] = schemas
+
+
+STEP 2: POST /api/toe-test
+─────────────────────────────────────────────────────────────────────────────────
+  File: api.py lines 782–970
+
+  a) Reads cached TOD results
+  b) Builds include_control_ids = {only TOD-PASS control IDs}
+  c) Loads evidence with filter → skips DI extraction for non-PASS controls
+  d) Runs TOE with tod_results + pre_schemas → second layer of filtering
+  e) Full RCM universe maintained via placeholder results
+
+  Fallback: If no cached TOD results → extracts everything (old behavior)
+
+
+================================================================================
+  PATH B: SOX AGENT FLOW  (the main user flow)
+================================================================================
+
+This is the flow used when the user interacts via the chat interface.
+State is preserved in AgentState across tool calls within a chat session.
+
+STEP 1: test_of_design tool runs
+─────────────────────────────────────────────────────────────────────────────────
+  File: agent/tools/test_of_design.py
+
+  a) Loads evidence, validates, runs TOD
+  b) Caches results in agent state:
+       state.tod_results = results        (list of TODControlResult)
+       state.tod_schemas = schemas        (dict of ControlSchema)
+       state.tod_evidence_folder = path
+
+
+STEP 2: test_of_effectiveness tool runs
+─────────────────────────────────────────────────────────────────────────────────
+  File: agent/tools/test_of_effectiveness.py
+
+  The TOE tool has THREE phases, ALL now filtered by TOD results:
+
+  PHASE 1 — Document List Generation (line 157-179)
+  ─────────────────────────────────────────────────
+    WHAT: Generates a "Required Documents" list telling the user what evidence
+          to provide for each control.
+
+    BEFORE (bug): Generated doc list for ALL controls from schemas
+      doc_list_schemas = state.pending_toe_schemas or state.tod_schemas  ← ALL
+
+    AFTER (fixed): Filters schemas to only TOD-passed controls FIRST
+      if state.tod_results is not None:
+          tod_pass_ids = {r.control_id for r in state.tod_results if r.result == "PASS"}
+          doc_list_schemas = {cid: s for cid, s in doc_list_schemas.items() if cid in tod_pass_ids}
+
+    IMPACT: User only sees required documents for controls that passed TOD.
+            No wasted effort gathering evidence for failed controls.
+
+
+  PHASE 2 — Evidence Validation (line 269-310)
+  ─────────────────────────────────────────────
+    WHAT: Validates that the user's evidence folder has all required documents.
+          Uses Azure Document Intelligence to extract PDF/DOCX/images.
+          Uses Azure embeddings to match evidence files to required documents.
+          THIS IS THE MOST EXPENSIVE PHASE (DI + embedding API calls per file).
+
+    BEFORE (bug): Validated ALL controls regardless of TOD results
+      doc_schemas = state.pending_toe_schemas or state.tod_schemas  ← ALL
+      control_ids = list(doc_schemas.keys())                        ← ALL
+
+    AFTER (fixed): Filters to TOD-passed controls FIRST
+      if state.tod_results is not None:
+          tod_pass_ids = {r.control_id for r in state.tod_results if r.result == "PASS"}
+          doc_schemas = {cid: s for cid, s in doc_schemas.items() if cid in tod_pass_ids}
+      control_ids = list(doc_schemas.keys())  ← ONLY PASSED
+
+    IMPACT: DI extraction + embedding calls ONLY for TOD-passed control folders.
+            This is where the main time saving happens.
+
+    HOW THE VALIDATOR USES control_ids (evidence_validator.py line 147):
+      cid_upper_map = {cid.strip().upper(): cid for cid in control_ids}
+      → Only folders matching these IDs are scanned and extracted.
+      → Other folders are completely ignored (no DI calls, no embeddings).
+
+
+  PHASE 3 — Evidence Loading & TOE Evaluation (line 394-507)
+  ──────────────────────────────────────────────────────────
+    WHAT: Loads evidence into toe_bank, runs LLM evaluation per sample.
+
+    This was ALREADY correctly filtered before the fix:
+      include_control_ids = {r.control_id for r in state.tod_results if r.result == "PASS"}
+      toe_bank = load_toe_evidence_folder(evidence_folder, include_control_ids=...)
+      results = tester.test_all_toe(toe_bank, tod_results=state.tod_results, ...)
+
+    IMPACT: Only PASS controls get evidence loaded + LLM evaluation.
+
+
+================================================================================
+  THE ROOT CAUSE OF THE SLOWNESS
+================================================================================
+
+The user reported: "TOE is taking a lot of time despite only 2 controls passing TOD"
+
+Root cause: Phase 3 (evidence loading + LLM evaluation) was already filtered.
+But Phase 2 (evidence validation) was NOT filtered. This meant:
+
+  - If RCM had 10 controls and only 2 passed TOD:
+    - Phase 2 would extract ALL 10 controls' evidence files via Document Intelligence
+    - Phase 2 would run embeddings for ALL 10 controls' documents
+    - Only Phase 3 would finally skip the 8 failed controls
+
+  The DI extraction in Phase 2 was the bottleneck — it processes every file
+  (PDF, DOCX, images, etc.) using Azure Document Intelligence, which takes
+  several seconds per file. For 8 unnecessary controls with multiple samples
+  each, this could add minutes of wasted time.
+
+After the fix:
+  - Phase 1: Doc list generated for 2 controls only
+  - Phase 2: DI extraction + embeddings for 2 controls only
+  - Phase 3: Evidence loading + LLM evaluation for 2 controls only
+
+
+================================================================================
+  RCM UNIVERSE MAINTENANCE
+================================================================================
+
+Even though evidence extraction is skipped, the FULL RCM is maintained in results.
+
+TOD (TOD_Engine.py lines 3983-4007):
+  After evaluation, appends placeholder TODControlResult for every RCM control
+  that had no evidence folder:
+    result = "NO EVIDENCE"
+    design_adequate = "Unable to Assess"
+    overall_remarks = "Evidence folder not found — manual review required."
+
+TOE (TOE_Engine.py lines 3731-3809):
+  After evaluation, appends THREE categories of placeholders:
+
+  1. TOD-Failed controls (lines 3731-3754):
+     operating_effectiveness = "TOD Failed"
+     deficiency_type = "TOD Failed — TOE not required"
+     overall_remarks = "TOD failed. Design deficiency must be remediated first."
+
+  2. TOD-No-Evidence controls (lines 3756-3779):
+     operating_effectiveness = "No Evidence"
+     deficiency_type = "Unable to Assess"
+     overall_remarks = "No evidence provided in TOD. TOE not performed."
+
+  3. RCM controls with no TOE evidence folder (lines 3781-3809):
+     operating_effectiveness = "No Evidence"
+     deficiency_type = "Unable to Assess"
+     overall_remarks = "Evidence folder not found. Manual review required."
+
+  Final summary confirms full universe:
+    "Controls: {count} (RCM universe) | Evaluated: {n} | Samples: {n}"
+
+
+================================================================================
+  EXAMPLE SCENARIO
+================================================================================
+
+RCM has 5 controls: C-001, C-002, C-003, C-004, C-005
+
+TOD Results:
+  C-001  → PASS
+  C-002  → PASS
+  C-003  → FAIL        (design is inadequate)
+  C-004  → NO EVIDENCE (no TOD evidence provided)
+  C-005  → FAIL
+
+TOE Behavior (after fix):
+
+  Phase 1 — Document List:
+    Generated for: C-001, C-002 only (2 controls)
+    Skipped: C-003, C-004, C-005
+
+  Phase 2 — Evidence Validation:
+    DI Extraction for: C-001/, C-002/ folders only
+    Embedding matching for: C-001, C-002 documents only
+    Skipped: C-003/, C-004/, C-005/ folders entirely
+
+  Phase 3 — Evidence Loading:
+    toe_bank contains: C-001 (3 samples), C-002 (2 samples)
+    C-003, C-004, C-005 folders not even scanned
+
+  Phase 3 — LLM Evaluation:
+    C-001  → 3 samples evaluated → Effective
+    C-002  → 2 samples evaluated → Effective with Exceptions
+    C-003  → Placeholder: "TOD Failed — TOE not required"
+    C-004  → Placeholder: "No Evidence — TOE not performed"
+    C-005  → Placeholder: "TOD Failed — TOE not required"
+
+  Final results: 5 controls (full RCM universe)
+    Evaluated: 2 | Effective: 1 | Exceptions: 1 | TOD Failed: 2 | No Evidence: 1
+
+
+================================================================================
+  FILES MODIFIED
+================================================================================
+
+1. api.py (lines 751-754):
+   - TOD endpoint caches raw results + schemas in latest_results
+
+2. api.py (lines 872-905):
+   - TOE endpoint reads cached TOD results, filters evidence loading + evaluation
+
+3. agent/tools/test_of_effectiveness.py (line 157-165):  ← NEW FIX
+   - Phase 1 doc list generation filtered to TOD-passed controls only
+
+4. agent/tools/test_of_effectiveness.py (line 274-282):  ← NEW FIX
+   - Phase 2 evidence validation filtered to TOD-passed controls only
+   - THIS was the root cause of the slowness (DI extraction for all controls)
+
+5. No changes to TOE_Engine.py — engine already supported filtering parameters
+================================================================================

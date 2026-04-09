@@ -1,0 +1,15 @@
+Sample ID: S1
+Source Document: PR-20240328 / PO-88502
+Test Date: 2024-06-10
+Tested By: Auditor - Priya Nair
+
+Procurement Request PR-20240328 for $8,200 submitted by Operations Lead Suresh Menon.
+Departmental Manager Anita Sharma approved on 2024-03-28 at 2:15 PM.
+Finance Team Lead Rekha Pillai approved on 2024-03-29 at 9:05 AM.
+Both approvals documented in workflow history with distinct user IDs.
+PR converted to PO #PO-88502 on 2024-03-29 after second approval.
+SAP config shows $5,000 threshold for dual sign-off requirement.
+Written procedure referenced in SAP: "Procurement Approval Matrix v1.2" but document
+could not be located on shared drive during walkthrough — Procurement Manager said
+"it's somewhere, we'll find it."
+NOTE: No supporting SOP document could be provided for this control.

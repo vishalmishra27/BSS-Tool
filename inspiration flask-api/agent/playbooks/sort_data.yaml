@@ -1,0 +1,13 @@
+trigger: "Sort data by a column, order rows, arrange ascending or descending, sort table"
+title: "Sort DataFrame"
+steps:
+  - "Use modify_rcm(action='sort', column_name='Column To Sort', ascending=true)"
+  - "Set ascending=false for descending order"
+  - "Verify with inspect_dataframe(mode='head') to see the sorted result"
+notes:
+  - "Sorting modifies the DataFrame in place — row indices are reset"
+  - "Column must exist — check with inspect_dataframe(mode='info') first"
+tags:
+  - modify
+  - sort
+  - order

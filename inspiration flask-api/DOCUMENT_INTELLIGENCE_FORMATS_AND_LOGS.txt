@@ -1,0 +1,367 @@
+===============================================================================
+  ControlXAI — Document Intelligence: Supported Formats & Parse Logging
+===============================================================================
+
+                          Last Updated: 2026-03-26
+
+===============================================================================
+  1. OVERVIEW
+===============================================================================
+
+All document parsing across the ControlXAI platform (TOD Engine, TOE Engine,
+RCM Tester, SOX Scoping, RAG Engine, Evidence Validator) is now routed
+through a single module:
+
+    flask-api/Document_Intelligence.py
+
+This module uses Azure Document Intelligence (prebuilt-layout model) as the
+primary parser for all document and image formats. No format-specific
+third-party libraries (pdfplumber, openpyxl, python-docx, python-pptx,
+pikepdf, PyPDF2, pytesseract, chardet, etc.) are used for parsing.
+
+The only external parsing dependency retained is:
+  - extract-msg  (optional, for Outlook .msg files only — email protocol format)
+
+Everything else runs through Azure Document Intelligence or Python stdlib.
+
+
+===============================================================================
+  2. SUPPORTED FORMATS
+===============================================================================
+
+  Format        Extension(s)         Parser                   Notes
+  ─────────────────────────────────────────────────────────────────────────
+  PDF           .pdf                 Azure Doc Intelligence   Digital + scanned
+  Word          .docx                Azure Doc Intelligence   Full layout + tables
+  Word (legacy) .doc                 Azure Doc Intelligence   May need conversion
+  Excel         .xlsx, .xlsm         Azure Doc Intelligence   All sheets + tables
+  Excel (legacy).xls                 Azure Doc Intelligence   May need conversion
+  PowerPoint    .pptx                Azure Doc Intelligence   Slides + tables
+  CSV           .csv                 Python stdlib csv        Delimiter auto-detect
+  TSV           .tsv                 Python stdlib csv        Tab-delimited
+  PNG Image     .png                 Azure Doc Intelligence   OCR + layout
+  JPEG Image    .jpg, .jpeg          Azure Doc Intelligence   OCR + layout
+  TIFF Image    .tiff, .tif          Azure Doc Intelligence   OCR + layout
+  BMP Image     .bmp                 Azure Doc Intelligence   OCR + layout
+  Email (RFC822).eml                 Python stdlib email      Headers + body + attachments
+  Outlook Email .msg                 extract-msg (optional)   Headers + body
+  ─────────────────────────────────────────────────────────────────────────
+
+  TOTAL: 18 extensions across 10 format families.
+
+
+===============================================================================
+  3. AZURE DOCUMENT INTELLIGENCE CAPABILITIES
+===============================================================================
+
+  Azure Document Intelligence (prebuilt-layout model) provides:
+
+  ● TEXT EXTRACTION
+    - Native digital text extraction from PDFs, DOCX, XLSX, PPTX
+    - OCR for scanned documents and images (PNG, JPG, TIFF, BMP)
+    - Handwriting recognition for handwritten notes/forms
+    - Mixed content: digital text + scanned images in the same document
+
+  ● TABLE EXTRACTION
+    - Structured tables with row/column detection
+    - Cell-level content extraction
+    - Column header detection (cell.kind = "columnHeader")
+    - Multi-page table spanning
+
+  ● LAYOUT ANALYSIS
+    - Paragraph detection with role classification:
+      • title, sectionHeading, pageHeader, pageFooter, pageNumber
+    - Reading order detection
+    - Page-level word coordinates and confidence scores
+
+  ● LANGUAGE SUPPORT
+    - 300+ languages for print text
+    - 100+ languages for handwriting
+    - Auto-detection of document language
+
+  ● DOCUMENT TYPES IT HANDLES WELL
+    - Financial statements and trial balances
+    - Audit evidence (SOPs, policies, config exports)
+    - Transaction logs and approval documents
+    - Screenshots of system configurations
+    - Scanned PDFs with embedded images
+    - Multi-sheet Excel workbooks
+    - PowerPoint slide decks
+    - Mixed-format documents (text + tables + images)
+
+
+===============================================================================
+  4. FORMAT-SPECIFIC BEHAVIOR
+===============================================================================
+
+  PDF (.pdf)
+    - Sends raw bytes to Azure DI prebuilt-layout
+    - Extracts: text per page, tables with headers/rows, embedded image text
+    - Page-level word confidence scores returned
+    - Works for: digital PDFs, scanned PDFs, image-heavy PDFs
+
+  Excel (.xlsx, .xlsm, .xls)
+    - Azure DI parses all sheets, extracts tables with cell content
+    - Each sheet's table becomes a separate TableData object
+    - .xls (legacy binary format) may require conversion to .xlsx
+
+  Word (.docx, .doc)
+    - Extracts paragraphs, headings (with level), tables
+    - Embedded images are OCR'd
+    - .doc (legacy binary format) may require conversion to .docx
+
+  PowerPoint (.pptx)
+    - Extracts text from all slides and shapes
+    - Tables within slides are parsed into structured data
+    - Embedded images are OCR'd
+
+  Images (.png, .jpg, .jpeg, .tiff, .tif, .bmp)
+    - Full OCR via Azure Document Intelligence
+    - Word-level confidence scores
+    - Layout-aware: preserves reading order, table structure in images
+    - Handles: screenshots, scanned documents, photos of paper forms
+
+  CSV / TSV (.csv, .tsv)
+    - Parsed locally using Python stdlib csv module (no Azure DI call)
+    - Auto-detects delimiter (comma, tab, semicolon)
+    - Auto-detects encoding (UTF-8, UTF-16, Latin-1 via BOM detection)
+    - Row limit: 50,000 rows (configurable)
+
+  Email (.eml)
+    - Parsed with Python stdlib email module
+    - Extracts: From, To, Cc, Subject, Date, Message-ID headers
+    - Body: prefers plain text, falls back to HTML (stripped of tags)
+    - Attachments: recursively parsed through Document_Intelligence
+      (e.g., a PDF attached to an email gets sent to Azure DI)
+
+  Outlook Email (.msg)
+    - Requires optional extract-msg package
+    - Extracts: sender, to, cc, subject, date, body
+    - Falls back to HTML body if no plain text available
+    - Graceful error if extract-msg not installed
+
+
+===============================================================================
+  5. CONFIGURATION (Environment Variables)
+===============================================================================
+
+  Variable                              Default        Description
+  ─────────────────────────────────────────────────────────────────────────
+  AZURE_DOC_INTELLIGENCE_KEY            (required)     Azure DI API key
+  AZURE_DOC_INTELLIGENCE_ENDPOINT       (required)     Azure DI endpoint URL
+  DI_MAX_RETRIES                        3              Retry count for DI API
+  DI_RETRY_BASE_DELAY                   2              Base delay (secs) for retry
+  MAX_FILE_SIZE_MB                      50             Max file size to parse
+  PARSE_LOGGING                         1 (on)         Enable/disable parse logs
+  PARSE_LOG_DIR                         parse_logs/    Custom log directory
+  EVIDENCE_EMBEDDINGS                   1 (on)         Enable embedding selection
+  EVIDENCE_TOP_K                        12             Max chunks to select
+  LLM_EVIDENCE_PARSING                  1 (on)         LLM refinement pass
+  LLM_VISION_PARSING                    1 (on)         Azure Vision for images
+  EVIDENCE_PARSE_WORKERS                8              Parallel extraction workers
+  ─────────────────────────────────────────────────────────────────────────
+
+  Alternate key names also supported:
+    AZURE_DOCUMENT_INTELLIGENCE_KEY / AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT
+
+
+===============================================================================
+  6. PARSE LOGGING SYSTEM
+===============================================================================
+
+  When PARSE_LOGGING=1 (default), every document parsed through the system
+  generates a detailed log file on disk. These logs allow you to inspect
+  exactly what was extracted from each file and what was sent to the LLM.
+
+  ── Log Directory Structure ──
+
+    flask-api/parse_logs/
+    ├── documents/              Per-document parse logs
+    │   ├── 20260326_143000_evidence.pdf.log
+    │   ├── 20260326_143001_report.xlsx.log
+    │   ├── 20260326_143002_approval_email.eml.log
+    │   └── ...
+    └── embeddings/             Per-control embedding selection logs
+        ├── 20260326_143005_C-P2P-001_TOD.log
+        ├── 20260326_143006_C-P2P-002_s1_TOE.log
+        ├── 20260326_143006_C-P2P-002_s2_TOE.log
+        └── ...
+
+  File naming convention:
+    documents:  {YYYYMMDD}_{HHMMSS}_{filename}.log
+    embeddings: {YYYYMMDD}_{HHMMSS}_{control_id}[_s{sample}]_{engine}.log
+
+  ── Document Parse Log Contents ──
+
+    Each document log file contains:
+
+    ┌─────────────────────────────────────────────────────────────────────┐
+    │ HEADER                                                             │
+    │   Timestamp, Source Path, Filename, File Type, File Size           │
+    │   Document ID, Parser Used, Parse Status, Confidence               │
+    │   OCR Used, Duration, Warnings, Errors                             │
+    ├─────────────────────────────────────────────────────────────────────┤
+    │ METADATA                                                           │
+    │   Page Count, Language, Author, Title, Subject, Created At         │
+    │   Sheet Names (Excel), Slide Count (PPTX)                          │
+    │   Email From/To/Date/Subject (email formats)                       │
+    ├─────────────────────────────────────────────────────────────────────┤
+    │ SECTIONS SUMMARY                                                   │
+    │   Numbered list of all sections with type, page, text preview      │
+    │   e.g. [1] HEADING (page 1): "Quarterly Financial Review"          │
+    │        [2] PARAGRAPH (page 1): "This report covers..."             │
+    │        [3] TABLE (page 2): Account | Balance | Period | ...        │
+    ├─────────────────────────────────────────────────────────────────────┤
+    │ TABLES DETAIL                                                      │
+    │   For each table: column count, row count, page number             │
+    │   Headers row displayed, first 5 data rows shown                   │
+    ├─────────────────────────────────────────────────────────────────────┤
+    │ FULL PARSED TEXT                                                    │
+    │   The complete extracted text content — this is exactly what        │
+    │   the TOD/TOE engines receive as evidence input.                   │
+    └─────────────────────────────────────────────────────────────────────┘
+
+  ── Embedding Selection Log Contents ──
+
+    When the evidence text for a control is large enough to be chunked
+    and run through the embedding retrieval pipeline, a log file is
+    generated showing:
+
+    ┌─────────────────────────────────────────────────────────────────────┐
+    │ HEADER                                                             │
+    │   Timestamp, Engine (TOD/TOE), Control ID, Sample index            │
+    │   Original Text Length, Chunk Count, Chunks Selected               │
+    ├─────────────────────────────────────────────────────────────────────┤
+    │ EMBEDDING QUERY                                                    │
+    │   The query text assembled from RCM fields (control_id,            │
+    │   risk_id, control_description, control_objective, etc.)           │
+    │   This query is embedded and compared against all chunks.          │
+    ├─────────────────────────────────────────────────────────────────────┤
+    │ CHUNK SCORES (sorted by cosine similarity)                         │
+    │   Every chunk ranked with its similarity score:                    │
+    │   Rank  1: Chunk 15 (score: 0.8923) <- SELECTED  | preview...     │
+    │   Rank  2: Chunk 22 (score: 0.8756) <- SELECTED  | preview...     │
+    │   Rank 13: Chunk  7 (score: 0.6123)               | preview...    │
+    │   Shows which chunks were SELECTED vs dropped.                     │
+    ├─────────────────────────────────────────────────────────────────────┤
+    │ SELECTED CHUNKS CONTENT                                            │
+    │   Full text of every selected chunk, in order.                     │
+    ├─────────────────────────────────────────────────────────────────────┤
+    │ FINAL EVIDENCE TEXT SENT TO LLM                                    │
+    │   The assembled text that is passed to the LLM prompt.             │
+    │   This is what the model actually evaluates.                       │
+    └─────────────────────────────────────────────────────────────────────┘
+
+  ── How to Use These Logs ──
+
+    1. RUN A TOD/TOE EVALUATION as normal.
+
+    2. CHECK parse_logs/documents/ to see:
+       - Did the file parse successfully? (Parse Status)
+       - What confidence level? (Confidence score)
+       - Were there warnings? (e.g., truncation, legacy format)
+       - What text was actually extracted? (Full Parsed Text section)
+       - Were tables detected? (Tables Detail section)
+
+    3. CHECK parse_logs/embeddings/ to see:
+       - Which chunks of evidence were selected for the LLM?
+       - What similarity scores did each chunk get?
+       - Were the most relevant chunks actually selected?
+       - Is the embedding query (from RCM) picking up the right chunks?
+
+    4. COMMON ISSUES TO LOOK FOR:
+       - Empty "Full Parsed Text" → file didn't parse (check status/errors)
+       - Low confidence score → scanned document with poor OCR quality
+       - Tables with 0 rows → table detection failed
+       - Embedding log shows wrong chunks selected → RCM description may
+         need to be more specific, or EVIDENCE_TOP_K may need adjustment
+
+  ── Disabling Logs ──
+
+    Set environment variable:  PARSE_LOGGING=0
+
+    Or set a custom directory:  PARSE_LOG_DIR=/path/to/custom/logs/
+
+
+===============================================================================
+  7. PARSING PIPELINE ARCHITECTURE
+===============================================================================
+
+    User uploads file
+          │
+          ▼
+    parse_document(file_path)          [Document_Intelligence.py]
+          │
+          ├─ .csv/.tsv ──────────────► CsvParser (stdlib csv)
+          ├─ .eml ───────────────────► EmlParser (stdlib email)
+          ├─ .msg ───────────────────► MsgParser (extract-msg, optional)
+          └─ all others ─────────────► DocIntelligenceParser
+                                            │
+                                            ▼
+                                    Azure Doc Intelligence
+                                    (prebuilt-layout API)
+                                            │
+                                            ▼
+                                    AnalyzeResult
+                                    ├── content (full text)
+                                    ├── tables (structured)
+                                    ├── paragraphs (sections)
+                                    ├── pages (confidence)
+                                    └── languages
+                                            │
+                                            ▼
+                                    ParsedDocument
+                                    ├── full_text
+                                    ├── tables[]
+                                    ├── sections[]
+                                    ├── metadata
+                                    └── parse_meta
+                                            │
+                                    ┌───────┴───────┐
+                                    ▼               ▼
+                            _write_parse_log    return to caller
+                            (parse_logs/        (TOD/TOE/RAG)
+                             documents/)
+
+
+    TOD/TOE Engine receives evidence text
+          │
+          ▼
+    _prepare_evidence_for_prompt()
+          │
+          ├─ text <= 1 chunk ────────► return full text
+          └─ text > 1 chunk ─────────► embed all chunks
+                                            │
+                                            ▼
+                                    cosine similarity ranking
+                                            │
+                                            ▼
+                                    select top-K chunks
+                                            │
+                                    ┌───────┴───────┐
+                                    ▼               ▼
+                            _write_embedding_log  return selected
+                            (parse_logs/          text to LLM
+                             embeddings/)
+
+
+===============================================================================
+  8. LEGACY FORMAT NOTES
+===============================================================================
+
+  The following legacy formats may not be fully supported by Azure Document
+  Intelligence. If you encounter failures, convert to the modern format:
+
+    .doc  →  .docx  (use Microsoft Word or LibreOffice)
+    .xls  →  .xlsx  (use Microsoft Excel or LibreOffice)
+    .ppt  →  .pptx  (use Microsoft PowerPoint or LibreOffice)
+
+  When these formats are encountered, the system will:
+    1. Log a warning about the legacy format
+    2. Attempt to send the file to Azure DI anyway
+    3. If DI fails, return a clear error with conversion instructions
+
+
+===============================================================================
+  END OF DOCUMENT
+===============================================================================

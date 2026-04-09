@@ -541,11 +541,53 @@ def uat_lob_distribution():
                 SUM(CASE WHEN status='CLOSED' THEN 1 ELSE 0 END) as closed,
                 SUM(CASE WHEN status='REOPENED' THEN 1 ELSE 0 END) as reopened,
                 SUM(CASE WHEN status='CANCELLED' THEN 1 ELSE 0 END) as cancelled,
+                SUM(CASE WHEN status='READY_FOR_TESTING' THEN 1 ELSE 0 END) as ready_for_testing,
                 SUM(CASE WHEN status='NEEDS_FIX' THEN 1 ELSE 0 END) as needs_fix,
                 SUM(CASE WHEN status='DEFECT' THEN 1 ELSE 0 END) as defect
             FROM uat_cases GROUP BY lob ORDER BY lob
         """)
         return jsonify(list(rows))
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/uat/priority-distribution')
+def uat_priority_distribution():
+    try:
+        rows = query("""
+            SELECT priority,
+                COUNT(*) as count
+            FROM uat_cases GROUP BY priority ORDER BY priority
+        """)
+        return jsonify(list(rows))
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/legacy-products/raw')
+def legacy_products_raw():
+    try:
+        rows = query("""
+            SELECT product_id, product_name, lob,
+                   CASE WHEN migration_flag='migrate' THEN 'Migrate' ELSE 'Purge' END as rationalization_status,
+                   CASE WHEN status='configured' THEN NULL ELSE 'Pending Configuration' END as pending_on
+            FROM products ORDER BY lob, product_id
+        """)
+        return jsonify({'data': list(rows)})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/legacy-products/export')
+def legacy_products_export():
+    try:
+        rows = query("SELECT product_id, product_name, lob, migration_flag, status FROM products ORDER BY lob, product_id")
+        import csv, io
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(['product_id', 'product_name', 'lob', 'migration_flag', 'status'])
+        for r in rows:
+            writer.writerow([r['product_id'], r['product_name'], r['lob'], r['migration_flag'], r['status']])
+        resp = app.response_class(output.getvalue(), mimetype='text/csv')
+        resp.headers['Content-Disposition'] = 'attachment; filename=legacy_products.csv'
+        return resp
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -685,10 +727,14 @@ except Exception as e:
 
 # PDF analysis function (moved from old agent_service)
 def analyse_pdf_with_claude(base64_content, media_type, filename):
-    from groq import Groq as _Groq
-    _client = _Groq(api_key=os.getenv("GROQ_API_KEY"))
+    from openai import AzureOpenAI as _AzureOpenAI
+    _client = _AzureOpenAI(
+        api_key=os.getenv("AZURE_OPENAI_KEY"),
+        azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+        api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-12-01-preview"),
+    )
     response = _client.chat.completions.create(
-        model="llama-3.3-70b-versatile", max_tokens=2048,
+        model=os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o"), max_tokens=2048,
         messages=[{"role": "user", "content": [
             {"type": "image_url", "image_url": {"url": f"data:{media_type};base64,{base64_content}", "detail": "high"}},
             {"type": "text", "text": (

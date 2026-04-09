@@ -1,0 +1,15 @@
+Sample ID: S1
+Source Document: PR-20240422 / SAP Budget Report / Config Screenshot
+Test Date: 2024-06-11
+Tested By: Auditor - Amit Verma
+
+Purchase Requisition PR-20240422 for $45,000 submitted by Marketing Manager Pooja Iyer
+on 2024-04-22 for a brand campaign. Department: Marketing.
+Marketing's approved quarterly budget: $120,000. YTD spend at time of PR: $98,000.
+PR amount ($45,000) would push total to $143,000 — exceeding budget by $23,000.
+SAP displayed error: "Budget exceeded — requisition blocked. Contact Finance Controller."
+PR status changed to "Blocked" automatically. User could not proceed.
+Finance Controller Anil Deshmukh received an automated notification.
+Budget validation logic confirmed in SAP config (SPRO path: Funds Management >
+Budget Control > Activate Availability Control). Threshold set to 100% of quarterly budget.
+No manual override option exists at the requisition level.

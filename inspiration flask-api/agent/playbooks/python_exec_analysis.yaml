@@ -1,0 +1,16 @@
+trigger: "Run custom analysis, calculate statistics, group by, pivot table, custom Python code on data"
+title: "Custom Python Analysis"
+steps:
+  - "Use execute_python(code='...') with the loaded DataFrame available as 'df'"
+  - "Example groupby: execute_python(code='print(df.groupby(\"Process\")[\"Risk Rating\"].value_counts())')"
+  - "Example value counts: execute_python(code='print(df[\"Control Type\"].value_counts())')"
+  - "Example filtered stats: execute_python(code='high_risk = df[df[\"Risk Rating\"] == \"High\"]; print(f\"High risk controls: {len(high_risk)}\"); print(high_risk[[\"Control Id\", \"Control Description\"]].to_string())')"
+notes:
+  - "The DataFrame is available as 'df' in the execution namespace"
+  - "pandas, numpy, and openpyxl are available in the namespace"
+  - "Output is captured from print() calls — always use print() to show results"
+  - "Do NOT use execute_python to simulate tools that don't exist — use dedicated tools instead"
+tags:
+  - analysis
+  - python
+  - custom

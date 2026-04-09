@@ -1,0 +1,13 @@
+Sample ID: S1
+Source Document: PO-89203 / SAP Access Log / IT-7892
+Test Date: 2024-06-15
+Tested By: Auditor - Amit Verma
+
+PO-89203 for $18,500 created by Senior Buyer Rahul Nair (RNAIR) on 2024-05-03.
+PO approved by the SAME user RNAIR on 2024-05-03.
+SAP log shows RNAIR was temporarily granted "PO_APPROVE" role on 2024-05-01 because
+Procurement Manager Deepa Menon was on leave.
+Emergency access granted by IT Admin via ticket IT-7892 (see attached).
+No senior management approval for the temporary role change.
+Normal operation: PO_CREATE and PO_APPROVE are separate roles; SAP blocks same user.
+No automated monitoring for temporary role assignments creating SoD conflicts.

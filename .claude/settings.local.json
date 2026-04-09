@@ -34,6 +34,7 @@
       "Bash(curl -s -X POST http://localhost:5001/api/auth/login -H \"Content-Type: application/json\" -d '{\"\"\"\"username\"\"\"\":\"\"\"\"admin\"\"\"\",\"\"\"\"password\"\"\"\":\"\"\"\"admin\"\"\"\"}')",
       "Bash(curl -s -X POST http://localhost:5001/api/auth/login -H \"Content-Type: application/json\" -d '{\"\"\"\"username\"\"\"\":\"\"\"\"prog_director\"\"\"\",\"\"\"\"password\"\"\"\":\"\"\"\"password\"\"\"\"}')",
       "Bash(curl -s -X POST http://localhost:5001/api/auth/login -H \"Content-Type: application/json\" -d '{\"\"\"\"username\"\"\"\":\"\"\"\"prog_director\"\"\"\",\"\"\"\"password\"\"\"\":\"\"\"\"kpmg1234\"\"\"\"}')",
+<<<<<<< Updated upstream
       "Read(//usr/local/bin/**)",
       "Read(//Users/abhaya/Library/Python/**)",
       "Bash(pyenv versions:*)",
@@ -75,6 +76,10 @@
       "Bash(curl -s -X POST http://localhost:5001/api/auth/login -H 'Content-Type: application/json' -d '{\"username\":\"james.okonkwo\",\"password\":\"admin123\"}')",
       "Bash(curl -s http://localhost:5001/api/health)",
       "Bash(/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/bin/python3 -m pip list)"
+=======
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" -X POST -F \"file=@/tmp/test_upload.csv\" http://localhost:8080/api/data-agent/upload)",
+      "Bash(.venv/bin/pip install:*)"
+>>>>>>> Stashed changes
     ]
   }
 }

@@ -1,0 +1,11 @@
+Sample ID: S1
+Source Document: INV-2024-5543 / SAP Duplicate Check Config
+Test Date: 2024-06-18
+Tested By: Auditor - Priya Nair
+
+Tested duplicate invoice detection. INV-2024-5543 already posted for Acme ($22,400).
+Re-entered same invoice — SAP blocked: "Duplicate invoice detected."
+Override by AP Supervisor with justification is possible and logged.
+Duplicate check fields: Invoice Number + Vendor ID + Amount.
+Limitation: slight number variations (INV-2024-5543 vs INV-2024-5543A) not flagged.
+AP Supervisor override properly gated — only AP_SUPERVISOR role can release.
