@@ -32,6 +32,7 @@ import ReconciliationAgentPage from './pages/ReconciliationAgentPage';
 import OcrAgentPage from './pages/OcrAgentPage';
 import DataManagementAgentPage from './pages/DataManagementAgentPage';
 import UATDashboardPage from './pages/UATDashboardPage';
+import UATAutomationPage from './pages/UATAutomationPage';
 import AgentChatPage from './pages/AgentChatPage';
 import AgentDescriptionsPage from './pages/AgentDescriptionsPage';
 
@@ -110,7 +111,10 @@ const ALL_NAV_ITEMS = [
   },
   {
     label: 'UAT', path: '/uat', icon: <IconUAT />, module: 'uat', dot: true,
-    children: [{ label: 'UAT Dashboard', path: '/uat' }],
+    children: [
+      { label: 'UAT Dashboard',    path: '/uat' },
+      { label: 'UAT Automation',   path: '/uat/automation' },
+    ],
   },
   { label: 'BPM',       path: '/bpm',       icon: <IconBPM />,      module: 'dashboard', dot: true },
   { label: 'Migration', path: '/migration', icon: <IconMigration />,module: 'dashboard', dot: true },
@@ -232,6 +236,7 @@ function AppLayout({ onLogout }) {
           <Route path="/reconciliation"    element={<DashboardPage />} />
           <Route path="/product-dashboard" element={<ProductDashboardPage />} />
           <Route path="/uat"               element={<UATDashboardPage />} />
+          <Route path="/uat/automation"    element={<UATAutomationPage />} />
           <Route path="/workflow"          element={<WorkflowTrackerPage readOnly={isReadOnly()} canAssign={can('workflow_assign')} canComment={can('workflow_comment')} canUpload={can('workflow_upload')} />} />
           <Route path="/bpm"               element={<Bpm />} />
           <Route path="/migration"         element={<Summary />} />
