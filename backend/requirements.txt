@@ -16,5 +16,8 @@ xlrd>=2.0.1
 azure-ai-documentintelligence>=1.0.0
 azure-core>=1.30.0
 
+# UAT Automation — browser test execution
+playwright>=1.47.0
+
 # Optional: Outlook .msg email parsing
 # extract-msg>=0.28.0

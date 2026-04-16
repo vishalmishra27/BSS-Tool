@@ -819,6 +819,14 @@ try:
 except Exception as e:
     logger.warning(f"OCR blueprint unavailable: {e}")
 
+# ─── Register UAT Automation blueprint ───────────────────────────────────────
+try:
+    from uat_automation.endpoints import uat_automation_bp
+    app.register_blueprint(uat_automation_bp, url_prefix='/api/uat/automation')
+    logger.info("UAT Automation blueprint registered at /api/uat/automation")
+except Exception as e:
+    logger.warning(f"UAT Automation blueprint unavailable: {e}")
+
 if __name__ == '__main__':
     port = int(os.getenv('FLASK_PORT', 5001))
     app.run(debug=True, port=port)
