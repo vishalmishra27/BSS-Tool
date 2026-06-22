@@ -108,6 +108,37 @@ ROLE_PERMISSIONS = {
 }
 
 
+# ─── Role Hierarchy (for BPM task assignment & project scoping) ─────────────────
+# Higher number = higher privilege. Tasks may only be assigned to a strictly
+# lower level than the assigner ("below the hierarchy").
+ROLE_HIERARCHY = {
+    'programme_director': 100,   # superadmin
+    'engagement_manager': 80,
+    'bss_consultant':     50,
+    'qa_manager':         50,
+    'data_analyst':       50,
+    'client_sponsor':     10,
+    'client_it_lead':     10,
+    'client_operations':  10,
+}
+
+# Worker roles: may update status + comment on their own assigned tasks only.
+WORKER_ROLES = {'bss_consultant', 'qa_manager', 'data_analyst'}
+# Manager roles: may create projects and assign tasks below their level.
+MANAGER_ROLES = {'programme_director', 'engagement_manager'}
+# Client roles: strictly read-only across BPM.
+CLIENT_ROLES = {'client_sponsor', 'client_it_lead', 'client_operations'}
+
+
+def hierarchy_level(role: str) -> int:
+    return ROLE_HIERARCHY.get(role, 0)
+
+
+def can_assign_to(assigner_role: str, assignee_role: str) -> bool:
+    """True if assigner may assign a task to assignee (strictly below in hierarchy)."""
+    return hierarchy_level(assignee_role) < hierarchy_level(assigner_role)
+
+
 def hash_password(plain: str) -> str:
     return bcrypt.hashpw(plain.encode(), bcrypt.gensalt()).decode()
 

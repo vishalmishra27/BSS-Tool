@@ -708,6 +708,16 @@ def list_users():
         return jsonify({'error': str(e)}), 500
 
 
+# ─── BPM (projects / tasks / user management) ────────────────────────────────
+try:
+    from bpm_endpoints import bpm_bp, init_bpm, ensure_bpm_schema
+    init_bpm(query)                 # reuse the shared DB query helper
+    ensure_bpm_schema(query)        # idempotent CREATE TABLE IF NOT EXISTS on boot
+    app.register_blueprint(bpm_bp, url_prefix='/api/bpm')
+    logger.info("BPM blueprint registered at /api/bpm")
+except Exception as e:
+    logger.warning(f"BPM blueprint unavailable: {e}")
+
 # ─── Agentic AI (new tool-calling agent) ─────────────────────────────────────
 try:
     from agent_endpoints import agent_bp
