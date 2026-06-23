@@ -837,6 +837,14 @@ try:
 except Exception as e:
     logger.warning(f"UAT Automation blueprint unavailable: {e}")
 
+# ─── Register Network (Enterprise Assurance) blueprint ────────────────────────
+try:
+    from network_endpoints import network_bp
+    app.register_blueprint(network_bp, url_prefix='/api/network')
+    logger.info("Network blueprint registered at /api/network")
+except Exception as e:
+    logger.warning(f"Network blueprint unavailable: {e}")
+
 if __name__ == '__main__':
     port = int(os.getenv('FLASK_PORT', 5001))
     app.run(debug=True, port=port)

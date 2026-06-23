@@ -1,0 +1,338 @@
+================================================================================
+               UAT AUTOMATION TOOL — TECHNICAL WORKFLOW DOCUMENT
+================================================================================
+
+
+1. WHAT THIS TOOL DOES
+================================================================================
+
+This is a backend-driven User Acceptance Testing (UAT) automation tool.
+
+It allows a tester to:
+  - Upload an Excel file containing test cases (each row = one browser action)
+  - Trigger automated browser execution of those test cases via Playwright
+  - Monitor progress in real time through a Streamlit dashboard
+  - Review results: pass/fail per step, error messages, and screenshots
+
+The core idea is that a non-technical tester writes test steps in Excel
+(navigate to URL, click button, type text, check if text appears, etc.)
+and the tool replays those steps on a real browser, reporting exactly
+what passed and what failed, with visual proof via screenshots.
+
+
+2. TECH STACK
+================================================================================
+
+  Component           Technology          Purpose
+  ─────────────────   ──────────────────  ─────────────────────────────────────
+  REST API            Flask + Flask-CORS  Handles uploads, triggers runs, serves results
+  Browser engine      Playwright          Launches Chromium, executes actions on real pages
+  Excel parsing       pandas + openpyxl   Reads .xlsx files, validates schema
+  Database            SQLite              Stores test runs, steps, and results
+  Frontend            Streamlit           Dashboard for upload, run, live monitoring
+  Screenshots         PNG files on disk   Visual proof captured after every step
+
+
+3. EXCEL SCHEMA (INPUT FORMAT)
+================================================================================
+
+The uploaded Excel must have these exact columns (case-insensitive):
+
+  Column            Required?   Description
+  ────────────────  ──────────  ─────────────────────────────────────────
+  test_case_id      Yes         Groups steps into logical test cases (e.g., TC001)
+  step_id           Yes         Unique step within a test case (e.g., S1, S2)
+  action            Yes         What to do — one of 8 supported actions (see below)
+  selector          Depends     CSS selector for the target element
+  input_value       Depends     Value to type, URL to navigate to, wait duration, etc.
+  expected_result   Depends     Text to assert, or a human-readable note
+
+Supported actions:
+  navigate        — Opens a URL in the browser (URL goes in input_value)
+  click           — Clicks the element matched by selector
+  type            — Types input_value into the element matched by selector
+  assert_text     — Checks that the element's text contains expected_result
+  assert_visible  — Waits for the element to become visible
+  wait            — Pauses execution (input_value = seconds if <100, else ms)
+  select_dropdown — Picks an option from a <select> element
+  hover           — Hovers the mouse over the element
+
+
+4. END-TO-END WORKFLOW
+================================================================================
+
+The full lifecycle of a test run is:
+
+  UPLOAD ──> PARSE ──> STORE ──> EXECUTE ──> RECORD ──> RETRIEVE
+
+Here is each stage in detail:
+
+
+STAGE 1: UPLOAD (POST /upload)
+─────────────────────────────────────────────────────────────────────────────
+  User sends an .xlsx file via multipart form upload.
+
+  What happens:
+    1. Flask receives the file, validates extension (.xlsx or .xls only)
+    2. File is saved to the uploads/ directory with a sanitized filename
+    3. Control passes to the Excel parser
+
+  File: app.py → upload() function
+
+
+STAGE 2: PARSE (excel_parser.py)
+─────────────────────────────────────────────────────────────────────────────
+  The saved Excel file is read and validated.
+
+  What happens:
+    1. pandas reads the file via openpyxl engine
+    2. Column names are normalized to lowercase
+    3. Missing required columns → error returned to user
+    4. Each row is validated:
+       - action must be one of the 8 supported actions
+       - test_case_id and step_id must not be empty
+    5. Rows are converted to a list of dictionaries
+    6. If anything is wrong, an ExcelParseError is raised with a specific
+       message (e.g., "Row 5: unsupported action 'scroll'")
+
+  File: runner/excel_parser.py → parse_excel() function
+
+
+STAGE 3: STORE (db.py)
+─────────────────────────────────────────────────────────────────────────────
+  Parsed steps are written to SQLite.
+
+  What happens:
+    1. A new row is inserted into test_runs table with status = "pending"
+       This generates a test_run_id (auto-incrementing integer)
+    2. Each parsed step is inserted into test_steps table, linked to
+       the test_run_id, preserving the original row order via step_order
+    3. The test_run_id is returned to the user in the JSON response
+
+  Database tables:
+    test_runs   — id, filename, status, created_at, started_at, finished_at
+    test_steps  — id, test_run_id, test_case_id, step_id, action, selector,
+                  input_value, expected_result, step_order
+    test_results — id, test_run_id, test_case_id, step_id, status,
+                   error_message, screenshot_path, timestamp
+
+  File: models/db.py → create_test_run(), insert_test_steps()
+
+
+STAGE 4: EXECUTE (POST /run/<test_run_id>)
+─────────────────────────────────────────────────────────────────────────────
+  User triggers execution. This is where the actual browser automation runs.
+
+  What happens:
+    1. Flask spawns a background thread (so the API response returns
+       immediately with status = "running")
+    2. The thread calls run_test_cases(test_run_id)
+    3. Playwright launches a Chromium browser (HEADED by default, because
+       some enterprise/BSS portals block headless browsers)
+    4. A browser context and page are created
+    5. A dialog handler is attached: page.on("dialog", dismiss) — this
+       auto-dismisses any unexpected alert/confirm/prompt popups so they
+       don't freeze the run
+    6. All test_steps for the run are fetched from SQLite, ordered by
+       step_order
+
+  File: app.py → run() function
+  File: runner/playwright_runner.py → run_test_cases()
+
+
+STAGE 5: STEP-BY-STEP EXECUTION (playwright_runner.py)
+─────────────────────────────────────────────────────────────────────────────
+  Each step is executed sequentially. This is the core of the tool.
+
+  For EACH step in the ordered list:
+
+    a) ACTION DISPATCH
+       The step's "action" field is matched via an if/elif chain in
+       _execute_step(). Each branch calls the corresponding Playwright
+       API method:
+
+         action == "navigate"       →  page.goto(url)
+         action == "click"          →  page.click(selector)
+         action == "type"           →  page.fill(selector, value)
+         action == "assert_text"    →  page.locator(selector).inner_text()
+                                       then string comparison
+         action == "assert_visible" →  page.locator(selector).wait_for(visible)
+         action == "wait"           →  page.wait_for_timeout(ms)
+         action == "select_dropdown"→  page.select_option(selector, value)
+         action == "hover"          →  page.hover(selector)
+
+    b) ERROR HANDLING
+       If the step throws an exception:
+         - TimeoutError     → "Timeout: ..." (element not found within 10s)
+         - AssertionError   → "Assertion failed: expected X in Y"
+         - Any other error  → "ErrorType: message"
+       The step is marked "failed" but execution CONTINUES to the next step.
+       One failure does NOT abort the entire test run.
+
+    c) SCREENSHOT CAPTURE
+       After EVERY step (pass or fail), a screenshot is taken:
+         - Filename format: run{id}_{test_case}_{step}_{timestamp}.png
+         - Saved to the screenshots/ directory
+         - Filename stored in the database alongside the result
+
+    d) RESULT RECORDING
+       A row is inserted into test_results with:
+         - test_run_id, test_case_id, step_id
+         - status ("passed" or "failed")
+         - error_message (null if passed)
+         - screenshot_path (filename of the PNG)
+         - timestamp (UTC)
+
+  After all steps are processed:
+    - Browser and context are closed
+    - test_runs status is updated to "completed"
+    - If the runner itself crashes (not a step failure, but an infra error),
+      status is set to "failed" and a special __runner__ result is recorded
+
+  File: runner/playwright_runner.py → _execute_step(), run_test_cases()
+
+
+STAGE 6: RETRIEVE RESULTS
+─────────────────────────────────────────────────────────────────────────────
+  The user (or frontend) queries results via REST API.
+
+    GET /status/<test_run_id>
+      Returns: status (pending/running/completed/failed), progress counters
+      (total steps, completed, passed, failed), timestamps.
+      The frontend polls this every 1 second during a run.
+
+    GET /results/<test_run_id>
+      Returns: full per-step detail — action, selector, input, expected,
+      actual status, error message, screenshot filename, timestamp.
+      Steps are merged: step metadata from test_steps + outcome from
+      test_results. Steps not yet executed show status = "pending".
+
+    GET /screenshot/<filename>
+      Serves the actual PNG image file from the screenshots/ directory.
+      Used by the Streamlit frontend to display inline images.
+
+  File: app.py → status(), results(), screenshot()
+
+
+5. IMPORTANT IMPLEMENTATION DETAILS
+================================================================================
+
+NON-ABORTING EXECUTION
+  If step 3 of 10 fails, steps 4-10 still run. This is critical for UAT
+  where you want to see the full picture, not just the first failure. Each
+  step is wrapped in its own try/except block.
+
+HEADED BROWSER BY DEFAULT
+  Playwright launches with headless=False by default. Reason: many
+  enterprise BSS portals and internal apps detect headless browsers and
+  block them or behave differently. Headed mode mimics a real user.
+  Can be overridden per-run with POST /run/<id>?headless=true.
+
+LOGIN REDIRECT DETECTION
+  When a "navigate" action is executed, the runner compares the final URL
+  with the target URL. If the final URL contains "login", "signin", "auth",
+  or "sso" and the target didn't, the step fails with:
+    "Login redirect detected: navigated to <url>. Session may be expired."
+  This surfaces authentication issues clearly instead of silently failing
+  downstream steps on the login page.
+
+TIMEOUT HANDLING
+  Every Playwright action has a 10-second default timeout (navigate gets 30s).
+  If an element isn't found or a page doesn't load within that window, a
+  TimeoutError is caught and recorded. The timeout prevents the runner from
+  hanging indefinitely on broken pages.
+
+DIALOG AUTO-DISMISS
+  The page registers a "dialog" event handler that immediately dismisses
+  any JavaScript alert(), confirm(), or prompt() popup. Without this,
+  an unexpected popup would freeze the runner waiting for user interaction
+  that never comes.
+
+BACKGROUND THREAD EXECUTION
+  POST /run returns immediately. The actual Playwright execution runs in
+  a daemon thread. This means:
+    - The API stays responsive during test execution
+    - The frontend can poll /status and /results while the run is in progress
+    - If the Flask process is killed, the daemon thread dies too (no orphans)
+
+SCREENSHOT AFTER EVERY STEP
+  Not just on failures — every step gets a screenshot. This provides a
+  complete visual trail of the test run, useful for debugging timing issues
+  or verifying that the right page was displayed even when the step passed.
+
+SQLITE FOR SIMPLICITY
+  No external database server needed. The SQLite file (uat.db) is created
+  automatically on first run. Trade-off: not suited for concurrent heavy
+  load, but perfect for a single-user UAT tool.
+
+FLASK-CORS ENABLED
+  All origins are allowed. This lets a React frontend on any port connect
+  during development. Should be locked down before production deployment.
+
+
+6. API REFERENCE (QUICK)
+================================================================================
+
+  Method   Endpoint                  Purpose
+  ──────   ────────────────────────  ─────────────────────────────────────
+  POST     /upload                   Upload Excel, parse, store. Returns test_run_id
+  POST     /run/<test_run_id>        Trigger Playwright execution in background
+  GET      /status/<test_run_id>     Live status + pass/fail counters
+  GET      /results/<test_run_id>    Full per-step results with screenshot paths
+  GET      /screenshot/<filename>    Serve a screenshot PNG
+  GET      /health                   Simple health check
+
+
+7. FILE STRUCTURE
+================================================================================
+
+  uat-automation-backend/
+  ├── app.py                          Flask app, all API routes
+  ├── runner/
+  │   ├── playwright_runner.py        Browser automation: step dispatch, screenshots
+  │   └── excel_parser.py             Excel reading and validation
+  ├── models/
+  │   └── db.py                       SQLite schema, all database operations
+  ├── streamlit_app.py                Streamlit frontend dashboard
+  ├── uploads/                        Uploaded Excel files (runtime)
+  ├── screenshots/                    Step screenshots (runtime)
+  ├── sample/
+  │   ├── sample_test_cases.xlsx      Basic 7-step sample (example.com)
+  │   └── sample_test_cases_advanced.xlsx  Advanced 32-step sample (herokuapp)
+  ├── requirements.txt                Python dependencies
+  └── uat.db                          SQLite database (created at runtime)
+
+
+8. DATA FLOW DIAGRAM
+================================================================================
+
+  User                    Flask API                 SQLite              Playwright
+   │                         │                        │                     │
+   │── upload .xlsx ────────>│                        │                     │
+   │                         │── parse_excel() ──────>│                     │
+   │                         │── create_test_run() ──>│                     │
+   │                         │── insert_test_steps()─>│                     │
+   │<── test_run_id ─────────│                        │                     │
+   │                         │                        │                     │
+   │── POST /run/<id> ──────>│                        │                     │
+   │<── {"status":"running"}─│                        │                     │
+   │                         │── thread ─────────────────────────────────> launch browser
+   │                         │                        │                     │
+   │                         │                        │      for each step: │
+   │                         │                        │        _execute_step()
+   │                         │                        │        screenshot()
+   │                         │                        │<── insert_result() ─│
+   │                         │                        │                     │
+   │── GET /status/<id> ────>│── query ──────────────>│                     │
+   │<── progress + counts ───│<── rows ──────────────│                     │
+   │                         │                        │                     │
+   │── GET /results/<id> ───>│── query ──────────────>│                     │
+   │<── full step details ───│<── rows ──────────────│                     │
+   │                         │                        │                     │
+   │── GET /screenshot/x ───>│                        │                     │
+   │<── PNG file ────────────│                        │                     │
+
+
+================================================================================
+                              END OF DOCUMENT
+================================================================================
