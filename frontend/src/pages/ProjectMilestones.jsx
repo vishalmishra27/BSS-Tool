@@ -60,58 +60,58 @@ const scrollbarStyles = `
   .workflow-main::-webkit-scrollbar {
     width: 8px;
   }
- 
+
   .workflow-main::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.1);
+    background: #E0E8F0;
     border-radius: 10px;
   }
- 
+
   .workflow-main::-webkit-scrollbar-thumb {
-    background: linear-gradient(45deg, #4178d9, #3059a0);
+    background: linear-gradient(45deg, #003087, #0066CC);
     border-radius: 10px;
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    border: 1px solid #E0E8F0;
   }
- 
+
   .workflow-main::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(45deg, #3059a0, #00338d);
+    background: linear-gradient(45deg, #001F5B, #003087);
   }
 
   /* Horizontal scrollbar for workflow nodes */
   .workflow-nodes-container::-webkit-scrollbar {
     height: 6px;
   }
- 
+
   .workflow-nodes-container::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.1);
+    background: #E0E8F0;
     border-radius: 8px;
     margin: 0 20px;
   }
- 
+
   .workflow-nodes-container::-webkit-scrollbar-thumb {
-    background: linear-gradient(90deg, #60a5fa, #3b82f6);
+    background: linear-gradient(90deg, #0066CC, #003087);
     border-radius: 8px;
-    border: 1px solid rgba(255, 255, 255, 0.3);
+    border: 1px solid #E0E8F0;
   }
- 
+
   .workflow-nodes-container::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(90deg, #3b82f6, #2563eb);
+    background: linear-gradient(90deg, #003087, #001F5B);
   }
 
   /* Checklist scrollbar */
   .checklist-container::-webkit-scrollbar {
     width: 4px;
   }
- 
+
   .checklist-container::-webkit-scrollbar-track {
     background: #f1f5f9;
     border-radius: 6px;
   }
- 
+
   .checklist-container::-webkit-scrollbar-thumb {
     background: linear-gradient(180deg, #64748b, #475569);
     border-radius: 6px;
   }
- 
+
   .checklist-container::-webkit-scrollbar-thumb:hover {
     background: linear-gradient(180deg, #475569, #334155);
   }
@@ -119,12 +119,12 @@ const scrollbarStyles = `
   /* Firefox scrollbar support */
   .workflow-main {
     scrollbar-width: thin;
-    scrollbar-color: #4178d9 rgba(255, 255, 255, 0.1);
+    scrollbar-color: #003087 #E0E8F0;
   }
- 
+
   .workflow-nodes-container {
     scrollbar-width: thin;
-    scrollbar-color: #60a5fa rgba(255, 255, 255, 0.1);
+    scrollbar-color: #0066CC #E0E8F0;
   }
 `;
 
@@ -479,38 +479,38 @@ const handleNodeClick = (node) => {
 
   if (loading) {
     return (
-      <div className="h-screen w-full bg-gradient-to-br from-[#00215a] via-[#1e3a8a] to-[#3059a0] overflow-y-auto workflow-main flex items-center justify-center">
+      <div className="h-screen w-full bg-[#F4F6FA] overflow-y-auto workflow-main flex items-center justify-center">
         <div className="text-center">
-          <div className="text-white text-2xl font-bold mb-4">Loading project milestones...</div>
-          <div className="text-white/80">Please wait while we fetch the latest data</div>
+          <div className="text-[#001F5B] text-2xl font-bold mb-4">Loading project milestones...</div>
+          <div className="text-[#6B7280]">Please wait while we fetch the latest data</div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="h-screen w-full bg-gradient-to-br from-[#00215a] via-[#1e3a8a] to-[#3059a0] overflow-y-auto workflow-main">
+    <div className="h-screen w-full bg-[#F4F6FA] overflow-y-auto workflow-main">
       <div className="container mx-auto px-6 py-8">
 
         <div className="mb-8">
           <div className="flex justify-between items-center mb-6">
             <div>
-              <h1 className="text-4xl font-bold text-white mb-3 tracking-tight">Project Milestones</h1>
-              <p className="text-white/80 text-lg">Click a stage to view its details and checklist</p>
+              <h1 className="text-4xl font-bold text-[#001F5B] mb-3 tracking-tight">Project Milestones</h1>
+              <p className="text-[#6B7280] text-lg">Click a stage to view its details and checklist</p>
             </div>
             {/* Dropdown filter */}
             <div className="relative">
               <select
                 value={filter}
                 onChange={(e) => setFilter(e.target.value)}
-                className="bg-white/10 backdrop-blur-lg text-white border border-white/20 rounded-lg py-2 px-4 pr-8 focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none cursor-pointer"
+                className="bg-white text-[#222222] border border-[#E0E8F0] rounded-lg py-2 px-4 pr-8 focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none cursor-pointer"
               >
-                <option value="pre" className="bg-[#00215a] text-white">Pre-Migration</option>
-                <option value="migration" className="bg-[#00215a] text-white">Migration</option>
-                <option value="post" className="bg-[#00215a] text-white">Post-Migration</option>
-                <option value="all" className="bg-[#00215a] text-white">All Phases</option>
+                <option value="pre" className="bg-white text-[#222222]">Pre-Migration</option>
+                <option value="migration" className="bg-white text-[#222222]">Migration</option>
+                <option value="post" className="bg-white text-[#222222]">Post-Migration</option>
+                <option value="all" className="bg-white text-[#222222]">All Phases</option>
               </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-white">
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-[#6B7280]">
                 <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
                   <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/>
                 </svg>
@@ -569,18 +569,18 @@ const handleNodeClick = (node) => {
           {selectedNode && (
             <div className="max-w-7xl mx-auto mb-8">
               <div className="text-center mb-8">
-                <h2 className="text-2xl font-bold text-white mb-2">{selectedNode.label}</h2>
-                <div className="w-24 h-1 bg-gradient-to-r from-blue-400 to-purple-500 mx-auto rounded-full"></div>
+                <h2 className="text-2xl font-bold text-[#001F5B] mb-2">{selectedNode.label}</h2>
+                <div className="w-24 h-1 bg-gradient-to-r from-[#003087] to-[#0066CC] mx-auto rounded-full"></div>
               </div>
-             
+
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-       
-                <div className="bg-white/95 backdrop-blur-lg rounded-2xl p-8 shadow-lg border border-white/20">
+
+                <div className="bg-white rounded-2xl p-8 shadow-sm border border-[#E0E8F0]">
                   <div className="flex items-center mb-6">
-                    <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center mr-3">
+                    <div className="w-8 h-8 bg-gradient-to-r from-[#003087] to-[#0066CC] rounded-lg flex items-center justify-center mr-3">
                       <span className="text-white text-sm font-bold">📋</span>
                     </div>
-                    <h3 className="text-xl font-semibold text-gray-800">Phase Details</h3>
+                    <h3 className="text-xl font-semibold text-[#001F5B]">Phase Details</h3>
                   </div>
                  
                 <div className="space-y-4">
@@ -603,12 +603,12 @@ const handleNodeClick = (node) => {
                 </div>
                 </div>
 
-                <div className="bg-white/95 backdrop-blur-lg rounded-2xl p-8 shadow-lg border border-white/20 flex flex-col">
+                <div className="bg-white rounded-2xl p-8 shadow-sm border border-[#E0E8F0] flex flex-col">
                   <div className="flex items-center mb-6">
-                    <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-blue-600 rounded-lg flex items-center justify-center mr-3">
+                    <div className="w-8 h-8 bg-gradient-to-r from-[#16A34A] to-[#0066CC] rounded-lg flex items-center justify-center mr-3">
                       <span className="text-white text-sm font-bold">✓</span>
                     </div>
-                    <h3 className="text-xl font-semibold text-gray-800">{selectedNode.label}: Checklist</h3>
+                    <h3 className="text-xl font-semibold text-[#001F5B]">{selectedNode.label}: Checklist</h3>
                   </div>
                  
                   <div className="checklist-container space-y-2 overflow-y-auto max-h-80 flex-grow pr-2">

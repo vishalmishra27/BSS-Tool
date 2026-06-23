@@ -175,7 +175,7 @@ const ChecklistItem = ({ item, onUpdate }) => {
             value={userName}
             onChange={handleUserNameChange}
             placeholder="Enter your name"
-            className="w-full border border-gray-300 rounded p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 mb-2"
+            className="w-full border border-gray-300 rounded p-2 text-sm focus:ring-2 focus:ring-kpmg-light focus:border-kpmg-light mb-2"
           />
 
           <label className="block text-sm font-medium text-gray-700 mb-1">Add Comment:</label>
@@ -183,7 +183,7 @@ const ChecklistItem = ({ item, onUpdate }) => {
             value={comment}
             onChange={handleCommentChange}
             placeholder="Enter your comment here..."
-            className="w-full border border-gray-300 rounded p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="w-full border border-gray-300 rounded p-2 text-sm focus:ring-2 focus:ring-kpmg-light focus:border-kpmg-light"
             rows={3}
             disabled={isSubmitting}
           />
@@ -201,7 +201,7 @@ const ChecklistItem = ({ item, onUpdate }) => {
               className={`px-4 py-2 font-semibold rounded text-sm ${
                 isSubmitting
                   ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                  : 'bg-blue-600 text-white hover:bg-blue-700'
+                  : 'bg-kpmg-blue text-white hover:bg-kpmg-light'
               }`}
             >
               {isSubmitting ? 'Adding...' : 'Add Comment'}

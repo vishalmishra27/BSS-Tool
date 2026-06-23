@@ -369,10 +369,10 @@ const TransformationDashboardStatic = () => {
   const styles = {
     container: {
       height: '100vh',
-      background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 50%, #cbd5e1 100%)',
-      color: '#1e293b',
+      background: '#F4F6FA',
+      color: '#222222',
       padding: '1.5rem',
-      fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+      fontFamily: "'Helvetica Neue', Arial, 'Segoe UI', sans-serif",
       overflowX: 'hidden',
       overflowY: 'auto',
     },
@@ -384,12 +384,11 @@ const TransformationDashboardStatic = () => {
       fontSize: '2.2rem',
       fontWeight: '700',
       marginBottom: '0.5rem',
-      color: '#1e40af',
-      textShadow: '0 2px 4px rgba(30, 64, 175, 0.1)',
+      color: '#001F5B',
     },
     subtitle: {
       fontSize: '1.1rem',
-      color: '#3b82f6',
+      color: '#6B7280',
       marginBottom: '1.5rem',
       fontWeight: '500',
     },
@@ -400,12 +399,12 @@ const TransformationDashboardStatic = () => {
       marginBottom: '1.5rem',
     },
     kpiCard: {
-      background: 'linear-gradient(135deg, #1e40af 0%, #3b82f6 100%)',
+      background: 'linear-gradient(90deg, #003087 0%, #0066CC 100%)',
       borderRadius: '12px',
       padding: '1.5rem',
       marginBottom: '1.5rem',
-      boxShadow: '0 4px 20px rgba(30, 64, 175, 0.3)',
-      border: '1px solid #1e40af',
+      boxShadow: '0 4px 20px rgba(0, 48, 135, 0.25)',
+      border: '1px solid #003087',
       transition: 'transform 0.3s ease, box-shadow 0.3s ease',
       color: '#ffffff',
       position: 'relative',
@@ -417,7 +416,7 @@ const TransformationDashboardStatic = () => {
     },
     kpiCardHover: {
       transform: 'translateY(-3px)',
-      boxShadow: '0 8px 30px rgba(30, 64, 175, 0.4)',
+      boxShadow: '0 8px 30px rgba(0, 48, 135, 0.35)',
     },
     kpiCardTitle: {
       fontSize: '1.1rem',

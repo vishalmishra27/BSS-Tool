@@ -176,23 +176,23 @@ const Task = () => {
       }
 
       .task-scrollbar::-webkit-scrollbar-track {
-        background: rgba(255, 255, 255, 0.1);
+        background: #F4F6FA;
         border-radius: 10px;
       }
 
       .task-scrollbar::-webkit-scrollbar-thumb {
-        background: linear-gradient(45deg, #4178d9, #3059a0);
+        background: linear-gradient(45deg, #0066CC, #003087);
         border-radius: 10px;
-        border: 1px solid rgba(255, 255, 255, 0.2);
+        border: 1px solid #E0E8F0;
       }
 
       .task-scrollbar::-webkit-scrollbar-thumb:hover {
-        background: linear-gradient(45deg, #3059a0, #00338d);
+        background: linear-gradient(45deg, #003087, #001F5B);
       }
 
       .task-scrollbar {
         scrollbar-width: thin;
-        scrollbar-color: #4178d9 rgba(255, 255, 255, 0.1);
+        scrollbar-color: #0066CC #F4F6FA;
       }
 
       .status-select option[value="OPEN"] {
@@ -321,10 +321,10 @@ const Task = () => {
   const styles = {
     container: {
       height: '100vh',
-      background: 'linear-gradient(135deg, #00215a 0%, #1e3a8a 50%, #3059a0 100%)',
-      color: '#ffffff',
+      background: '#F4F6FA',
+      color: '#222222',
       padding: '2rem',
-      fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+      fontFamily: "'Helvetica Neue', Arial, 'Segoe UI', sans-serif",
       overflowY: 'auto',
       overflowX: 'hidden',
     },
@@ -336,39 +336,35 @@ const Task = () => {
       fontSize: '2.5rem',
       fontWeight: '700',
       marginBottom: '0.5rem',
-      background: 'linear-gradient(45deg, #ffffff, #a5b4fc)',
-      WebkitBackgroundClip: 'text',
-      WebkitTextFillColor: 'transparent',
-      backgroundClip: 'text',
+      color: '#001F5B',
     },
     subtitle: {
       fontSize: '1.1rem',
-      color: 'rgba(255, 255, 255, 0.8)',
+      color: '#6B7280',
     },
     card: {
-      background: 'rgba(255, 255, 255, 0.1)',
-      backdropFilter: 'blur(20px)',
-      borderRadius: '20px',
+      background: '#FFFFFF',
+      borderRadius: '12px',
       padding: '2rem',
-      border: '1px solid rgba(255, 255, 255, 0.2)',
-      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+      border: '1px solid #E0E8F0',
+      boxShadow: '0 2px 12px rgba(0, 31, 91, 0.06)',
       marginBottom: '2rem',
     },
     cardTitle: {
       fontSize: '1.8rem',
       fontWeight: '600',
       marginBottom: '1.5rem',
-      color: '#ffffff',
+      color: '#001F5B',
     },
     table: {
       width: '100%',
       borderCollapse: 'collapse',
       borderRadius: '12px',
       overflow: 'hidden',
-      boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)',
+      boxShadow: '0 2px 12px rgba(0, 31, 91, 0.06)',
     },
     tableHeader: {
-      background: 'linear-gradient(135deg, #1e40af, #3730a3)',
+      background: 'linear-gradient(90deg, #003087 0%, #0066CC 100%)',
     },
     tableHeaderCell: {
       padding: '1rem 1.5rem',
@@ -381,23 +377,23 @@ const Task = () => {
       borderBottom: '2px solid rgba(255, 255, 255, 0.2)',
     },
     tableRow: {
-      background: 'rgba(255, 255, 255, 0.05)',
-      borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+      background: '#FFFFFF',
+      borderBottom: '1px solid #E0E8F0',
       transition: 'all 0.3s ease',
     },
     tableRowHover: {
-      background: 'rgba(255, 255, 255, 0.15)',
+      background: '#F4F6FA',
       transform: 'translateY(-1px)',
     },
     tableCell: {
       padding: '1rem 1.5rem',
       fontSize: '0.9rem',
-      color: '#ffffff',
+      color: '#222222',
       verticalAlign: 'middle',
     },
     clickableNumber: {
       cursor: 'pointer',
-      color: '#60a5fa',
+      color: '#0066CC',
       fontWeight: '600',
       textDecoration: 'underline',
       transition: 'all 0.3s ease',
@@ -405,7 +401,7 @@ const Task = () => {
     },
     clickableTestCase: {
       cursor: 'pointer',
-      color: '#a5b4fc',
+      color: '#003087',
       fontWeight: '600',
       textDecoration: 'underline',
       transition: 'all 0.3s ease',
@@ -451,27 +447,27 @@ const Task = () => {
     issueKey: {
       fontSize: '1.1rem',
       fontWeight: '600',
-      color: '#a5b4fc',
+      color: '#0066CC',
       marginBottom: '0.5rem',
     },
     issueTitle: {
       fontSize: '1.8rem',
       fontWeight: '700',
-      color: '#ffffff',
+      color: '#001F5B',
       lineHeight: '1.3',
       marginBottom: '1rem',
     },
     descriptionCard: {
-      background: 'rgba(255, 255, 255, 0.08)',
+      background: '#FFFFFF',
       borderRadius: '12px',
       padding: '1.5rem',
-      border: '1px solid rgba(255, 255, 255, 0.1)',
+      border: '1px solid #E0E8F0',
     },
     descriptionTitle: {
       fontSize: '1.1rem',
       fontWeight: '600',
       marginBottom: '1rem',
-      color: '#ffffff',
+      color: '#001F5B',
     },
     descriptionList: {
       listStyle: 'none',
@@ -480,20 +476,20 @@ const Task = () => {
     },
     descriptionItem: {
       padding: '0.5rem 0',
-      borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-      color: 'rgba(255, 255, 255, 0.9)',
+      borderBottom: '1px solid #F0F0F0',
+      color: '#222222',
     },
     activitySection: {
-      background: 'rgba(255, 255, 255, 0.08)',
+      background: '#FFFFFF',
       borderRadius: '12px',
       padding: '1.5rem',
-      border: '1px solid rgba(255, 255, 255, 0.1)',
+      border: '1px solid #E0E8F0',
     },
     activityTitle: {
       fontSize: '1.1rem',
       fontWeight: '600',
       marginBottom: '1rem',
-      color: '#ffffff',
+      color: '#001F5B',
     },
     commentBox: {
       marginBottom: '1.5rem',
@@ -501,18 +497,18 @@ const Task = () => {
     textarea: {
       width: '100%',
       minHeight: '80px',
-      background: 'rgba(0, 0, 0, 0.3)',
-      border: '1px solid rgba(255, 255, 255, 0.2)',
+      background: '#FFFFFF',
+      border: '1px solid #E0E8F0',
       borderRadius: '8px',
       padding: '0.75rem',
-      color: '#ffffff',
+      color: '#222222',
       fontSize: '0.9rem',
       resize: 'vertical',
       outline: 'none',
       transition: 'border-color 0.3s ease',
     },
     sendButton: {
-      background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
+      background: 'linear-gradient(90deg, #003087 0%, #0066CC 100%)',
       color: '#ffffff',
       border: 'none',
       borderRadius: '8px',
@@ -525,24 +521,24 @@ const Task = () => {
       float: 'right',
     },
     comment: {
-      background: 'rgba(255, 255, 255, 0.05)',
+      background: '#F4F6FA',
       borderRadius: '8px',
       padding: '1rem',
       marginBottom: '1rem',
-      border: '1px solid rgba(255, 255, 255, 0.1)',
+      border: '1px solid #E0E8F0',
     },
     commentAuthor: {
       fontWeight: '600',
-      color: '#a5b4fc',
+      color: '#003087',
       marginBottom: '0.25rem',
     },
     commentDate: {
       fontSize: '0.75rem',
-      color: 'rgba(255, 255, 255, 0.6)',
+      color: '#6B7280',
       marginBottom: '0.5rem',
     },
     commentText: {
-      color: 'rgba(255, 255, 255, 0.9)',
+      color: '#222222',
       lineHeight: '1.5',
     },
     statusDropdown: {
@@ -560,51 +556,51 @@ const Task = () => {
       appearance: 'auto',
     },
     detailsCard: {
-      background: 'rgba(255, 255, 255, 0.08)',
+      background: '#FFFFFF',
       borderRadius: '12px',
       padding: '1.5rem',
-      border: '1px solid rgba(255, 255, 255, 0.1)',
+      border: '1px solid #E0E8F0',
     },
     detailsTitle: {
       fontSize: '1.1rem',
       fontWeight: '600',
       marginBottom: '1rem',
-      color: '#ffffff',
+      color: '#001F5B',
     },
     detailRow: {
       display: 'flex',
       justifyContent: 'space-between',
       padding: '0.5rem 0',
-      borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+      borderBottom: '1px solid #F0F0F0',
     },
     detailLabel: {
-      color: 'rgba(255, 255, 255, 0.7)',
+      color: '#6B7280',
       fontSize: '0.85rem',
     },
     detailValue: {
-      color: '#ffffff',
+      color: '#222222',
       fontSize: '0.85rem',
       fontWeight: '500',
     },
     attachmentsCard: {
-      background: 'rgba(255, 255, 255, 0.08)',
+      background: '#FFFFFF',
       borderRadius: '12px',
       padding: '1.5rem',
-      border: '1px solid rgba(255, 255, 255, 0.1)',
+      border: '1px solid #E0E8F0',
     },
     fileInput: {
       width: '100%',
       padding: '0.75rem',
-      background: 'rgba(255, 255, 255, 0.1)',
-      border: '2px dashed rgba(255, 255, 255, 0.3)',
+      background: '#F4F6FA',
+      border: '2px dashed #9CA3AF',
       borderRadius: '8px',
-      color: '#ffffff',
+      color: '#222222',
       cursor: 'pointer',
       transition: 'all 0.3s ease',
     },
     attachmentItem: {
       padding: '0.5rem 0',
-      color: '#a5b4fc',
+      color: '#0066CC',
       fontSize: '0.85rem',
     },
   };
@@ -637,11 +633,11 @@ const Task = () => {
                 key={idx}
                 style={styles.tableRow}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
+                  e.currentTarget.style.background = '#F4F6FA';
                   e.currentTarget.style.transform = 'translateY(-1px)';
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                  e.currentTarget.style.background = '#FFFFFF';
                   e.currentTarget.style.transform = 'translateY(0)';
                 }}
               >
@@ -698,11 +694,11 @@ const Task = () => {
                 key={idx}
                 style={styles.tableRow}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
+                  e.currentTarget.style.background = '#F4F6FA';
                   e.currentTarget.style.transform = 'translateY(-1px)';
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                  e.currentTarget.style.background = '#FFFFFF';
                   e.currentTarget.style.transform = 'translateY(0)';
                 }}
               >
@@ -787,18 +783,18 @@ const Task = () => {
                 placeholder="Add a comment..."
                 value={commentInput}
                 onChange={handleCommentChange}
-                onFocus={(e) => (e.target.style.borderColor = 'rgba(59, 130, 246, 0.5)')}
-                onBlur={(e) => (e.target.style.borderColor = 'rgba(255, 255, 255, 0.2)')}
+                onFocus={(e) => (e.target.style.borderColor = '#0066CC')}
+                onBlur={(e) => (e.target.style.borderColor = '#E0E8F0')}
               />
               <button
                 style={styles.sendButton}
                 onClick={handleSendClick}
                 onMouseEnter={(e) => {
-                  e.target.style.background = 'linear-gradient(135deg, #2563eb, #1d4ed8)';
+                  e.target.style.background = 'linear-gradient(90deg, #001F5B 0%, #003087 100%)';
                   e.target.style.transform = 'translateY(-1px)';
                 }}
                 onMouseLeave={(e) => {
-                  e.target.style.background = 'linear-gradient(135deg, #3b82f6, #2563eb)';
+                  e.target.style.background = 'linear-gradient(90deg, #003087 0%, #0066CC 100%)';
                   e.target.style.transform = 'translateY(0)';
                 }}
               >
