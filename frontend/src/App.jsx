@@ -15,6 +15,7 @@ import ReconciliationDashboardPage from './pages/ReconciliationDashboardPage';
 import ProductDashboardPage from './pages/ProductDashboardPage';
 import WorkflowTrackerPage from './pages/WorkflowTrackerPage';
 import Bpm from './pages/Bpm';
+import NetworkPage from './pages/NetworkPage';
 import DashboardPage from './pages/DashboardPage';
 import UserAnalyticsPage from './pages/UserAnalyticsPage';
 import ConversionPage from './pages/ConversionPage';
@@ -33,6 +34,7 @@ import OcrAgentPage from './pages/OcrAgentPage';
 import DataManagementAgentPage from './pages/DataManagementAgentPage';
 import UATDashboardPage from './pages/UATDashboardPage';
 import UATAutomationPage from './pages/UATAutomationPage';
+import UATAutomationNewPage from './pages/UATAutomationNewPage';
 import AgentChatPage from './pages/AgentChatPage';
 import AgentDescriptionsPage from './pages/AgentDescriptionsPage';
 
@@ -69,9 +71,25 @@ const IconWorkflow = () => (
     <rect x="3" y="16" width="5" height="5"/><path d="M8 5.5h8M5.5 8v8M21 8.5v7"/>
   </svg>
 );
+const IconEnterprise = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/><path d="M9 9h1"/><path d="M9 13h1"/><path d="M9 17h1"/>
+  </svg>
+);
 const IconBPM = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+  </svg>
+);
+const IconNetwork = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="9" y="2" width="6" height="6" rx="1"/><rect x="16" y="16" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/>
+    <path d="M12 8v4"/><path d="M5 16v-2a2 2 0 012-2h10a2 2 0 012 2v2"/>
+  </svg>
+);
+const IconUATAuto = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/>
   </svg>
 );
 const IconMigration = () => (
@@ -116,7 +134,14 @@ const ALL_NAV_ITEMS = [
       { label: 'UAT Automation',   path: '/uat/automation' },
     ],
   },
-  { label: 'BPM',       path: '/bpm',       icon: <IconBPM />,      module: 'dashboard', dot: true },
+  {
+    label: 'Enterprise', path: '/enterprise/bpm', icon: <IconEnterprise />, module: 'dashboard', dot: true,
+    children: [
+      { label: 'BPM',     path: '/enterprise/bpm' },
+      { label: 'Network', path: '/enterprise/network' },
+    ],
+  },
+  { label: 'UAT Automation', path: '/uat-automation', icon: <IconUATAuto />, module: 'dashboard', dot: true },
   { label: 'Migration', path: '/migration', icon: <IconMigration />,module: 'dashboard', dot: true },
   {
     label: 'AI Agents', path: '/agent', icon: <IconAgent />, module: 'dashboard',
@@ -239,6 +264,9 @@ function AppLayout({ onLogout }) {
           <Route path="/uat/automation"    element={<UATAutomationPage />} />
           <Route path="/workflow"          element={<WorkflowTrackerPage readOnly={isReadOnly()} canAssign={can('workflow_assign')} canComment={can('workflow_comment')} canUpload={can('workflow_upload')} />} />
           <Route path="/bpm"               element={<Bpm />} />
+          <Route path="/enterprise/bpm"    element={<Bpm />} />
+          <Route path="/enterprise/network" element={<NetworkPage />} />
+          <Route path="/uat-automation"     element={<UATAutomationNewPage />} />
           <Route path="/migration"         element={<Summary />} />
           <Route path="/pdf-analysis"      element={<AnalyticsPage />} />
           <Route path="/analytics"         element={<UserAnalyticsPage />} />
