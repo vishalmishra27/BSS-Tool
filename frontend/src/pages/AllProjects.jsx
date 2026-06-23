@@ -153,9 +153,9 @@ const AllProjects = () => {
   const ScrollbarStyles = () => (
     <style>{`
       ::-webkit-scrollbar { width: 10px; }
-      ::-webkit-scrollbar-track { background: rgba(29, 42, 71, 0.5); border-radius: 10px; }
-      ::-webkit-scrollbar-thumb { background: #4a3c85; border-radius: 10px; }
-      ::-webkit-scrollbar-thumb:hover { background: #6a5acd; }
+      ::-webkit-scrollbar-track { background: #F4F6FA; border-radius: 10px; }
+      ::-webkit-scrollbar-thumb { background: #003087; border-radius: 10px; }
+      ::-webkit-scrollbar-thumb:hover { background: #0066CC; }
     `}</style>
   );
 
@@ -163,10 +163,10 @@ const AllProjects = () => {
     pageContainer: {
       display: 'flex',
       flexDirection: 'column',
-      fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+      fontFamily: "'Helvetica Neue', Arial, 'Segoe UI', sans-serif",
       height: '100vh',
-      background: 'linear-gradient(135deg, #1e3c72, #2a5298)',
-      color: '#e0e0e0'
+      background: '#F4F6FA',
+      color: '#222222'
     },
     mainContent: {
       flexGrow: 1,
@@ -174,11 +174,10 @@ const AllProjects = () => {
       overflowY: 'auto'
     },
     contentContainer: {
-      backgroundColor: 'rgba(29, 42, 71, 0.7)',
-      borderRadius: '20px',
+      backgroundColor: '#FFFFFF',
+      borderRadius: '12px',
       padding: '25px 35px',
-      backdropFilter: 'blur(10px)',
-      border: '1px solid rgba(255, 255, 255, 0.1)'
+      border: '1px solid #E0E8F0'
     },
     header: {
       display: 'flex',
@@ -189,33 +188,33 @@ const AllProjects = () => {
     headerH1: {
       fontWeight: '700',
       fontSize: '1.8rem',
-      color: '#ffffff'
+      color: '#001F5B'
     },
     filterContainer: {
       display: 'flex',
       gap: '15px'
     },
     filterSelect: {
-      backgroundColor: 'rgba(255, 255, 255, 0.1)',
-      border: '1px solid rgba(255, 255, 255, 0.2)',
+      backgroundColor: '#FFFFFF',
+      border: '1px solid #E0E8F0',
       borderRadius: '20px',
       padding: '8px 35px 8px 20px',
       fontWeight: '600',
       fontSize: '0.9rem',
-      color: '#e0e0e0',
+      color: '#222222',
       cursor: 'pointer',
       appearance: 'none',
-      backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%23e0e0e0' stroke-linecap='round' stroke-linejoin='round' stroke-width='2'%3E%3Cpath d='m6 9 6-6H0z'/%3E%3C/svg%3E")`,
+      backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%23222222' stroke-linecap='round' stroke-linejoin='round' stroke-width='2'%3E%3Cpath d='m6 9 6-6H0z'/%3E%3C/svg%3E")`,
       backgroundRepeat: 'no-repeat',
       backgroundPosition: 'right 15px center',
       backgroundSize: '10px'
     },
     option: {
-      backgroundColor: '#1e3c72',
-      color: '#e0e0e0'
+      backgroundColor: '#FFFFFF',
+      color: '#222222'
     },
     createBtn: {
-      backgroundColor: '#4a3c85',
+      backgroundColor: '#003087',
       border: 'none',
       borderRadius: '20px',
       padding: '8px 25px',
@@ -233,19 +232,19 @@ const AllProjects = () => {
       padding: '15px',
       textAlign: 'left',
       fontSize: '0.8rem',
-      color: '#c0c0c0',
+      color: '#6B7280',
       textTransform: 'uppercase',
       letterSpacing: '1px',
-      borderBottom: '2px solid #4a3c85'
+      borderBottom: '2px solid #E0E8F0'
     },
     td: {
       padding: '15px',
       verticalAlign: 'middle',
-      borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+      borderBottom: '1px solid #F0F0F0',
       fontSize: '0.9rem'
     },
     projectCodeCell: {
-      color: '#82aaff',
+      color: '#0066CC',
       fontWeight: 'bold',
       cursor: 'pointer',
       textDecoration: 'none'
@@ -254,7 +253,7 @@ const AllProjects = () => {
       display: 'flex',
       alignItems: 'center',
       gap: '8px',
-      color: '#a0a0a0',
+      color: '#6B7280',
       fontStyle: 'italic'
     },
     popupOverlay: {
@@ -263,26 +262,25 @@ const AllProjects = () => {
       left: 0,
       width: '100%',
       height: '100%',
-      backgroundColor: 'rgba(0, 0, 0, 0.7)',
+      backgroundColor: 'rgba(0, 0, 0, 0.45)',
       display: 'flex',
       justifyContent: 'center',
       alignItems: 'center',
-      zIndex: 1000,
-      backdropFilter: 'blur(5px)'
+      zIndex: 1000
     },
     popupContent: {
-      backgroundColor: 'rgba(29, 42, 71, 0.9)',
+      backgroundColor: '#FFFFFF',
       padding: '30px',
       borderRadius: '12px',
       width: '450px',
       maxWidth: '90%',
-      border: '1px solid rgba(255, 255, 255, 0.2)',
-      boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.37)'
+      border: '1px solid #E0E8F0',
+      boxShadow: '0 8px 40px rgba(0,0,0,0.2)'
     },
     popupTitle: {
       marginTop: 0,
       marginBottom: '25px',
-      color: '#ffffff'
+      color: '#001F5B'
     },
     popupForm: {
       display: 'grid',
@@ -294,14 +292,14 @@ const AllProjects = () => {
       flexDirection: 'column',
       gap: '5px',
       fontSize: '0.9rem',
-      color: '#c0c0c0'
+      color: '#6B7280'
     },
     popupInput: {
       padding: '10px',
       borderRadius: '5px',
-      border: '1px solid #4a3c85',
-      background: 'rgba(0,0,0,0.2)',
-      color: '#e0e0e0',
+      border: '1px solid #E0E8F0',
+      background: '#FFFFFF',
+      color: '#222222',
       fontSize: '0.9rem'
     },
     popupDescription: {
@@ -317,23 +315,23 @@ const AllProjects = () => {
       padding: '10px 20px',
       borderRadius: '5px',
       border: 'none',
-      background: '#4a3c85',
+      background: '#003087',
       color: '#fff',
       cursor: 'pointer'
     },
     buttonSecondary: {
       padding: '10px 20px',
       borderRadius: '5px',
-      border: 'none',
-      background: '#555',
-      color: '#fff',
+      border: '1px solid #E0E8F0',
+      background: '#F1F5F9',
+      color: '#4A4A4A',
       cursor: 'pointer'
     },
     buttonDanger: {
       padding: '10px 20px',
       borderRadius: '5px',
       border: 'none',
-      background: '#b91c1c',
+      background: '#DC2626',
       color: '#fff',
       cursor: 'pointer',
       marginRight: 'auto'

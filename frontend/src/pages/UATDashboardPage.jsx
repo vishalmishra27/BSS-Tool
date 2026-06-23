@@ -19,7 +19,7 @@ export default function UATDashboardPage() {
   }, []);
 
   if (loading) {
-    return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0a1628', color: '#00B0F0' }}>Loading...</div>;
+    return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F4F6FA', color: '#003087' }}>Loading...</div>;
   }
 
   const total = Number(summary?.total || 0);
@@ -53,115 +53,115 @@ export default function UATDashboardPage() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #0a1628 0%, #0f2847 50%, #132e4a 100%)', color: '#fff', fontFamily: "'Segoe UI', sans-serif", overflowY: 'auto', padding: '24px 28px' }}>
+    <div style={{ minHeight: '100vh', background: '#F4F6FA', color: '#222222', fontFamily: "'Helvetica Neue', Arial, 'Segoe UI', sans-serif", overflowY: 'auto', padding: '24px 28px' }}>
 
       {/* Header */}
       <div style={{ textAlign: 'center', marginBottom: 28 }}>
-        <h1 style={{ fontSize: 28, fontWeight: 700, margin: 0 }}>UAT Dashboard</h1>
-        <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, margin: '4px 0 0' }}>Comprehensive overview of User Acceptance Testing</p>
+        <h1 style={{ fontSize: 28, fontWeight: 700, margin: 0, color: '#001F5B' }}>UAT Dashboard</h1>
+        <p style={{ color: '#6B7280', fontSize: 13, margin: '4px 0 0' }}>Comprehensive overview of User Acceptance Testing</p>
       </div>
 
       {/* ──── Summary Cards ───────────────────────────────────────────────────── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 24 }}>
         {/* Total Test Cases */}
-        <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 10, padding: 20, border: '1px solid rgba(255,255,255,0.08)' }}>
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', fontWeight: 600, marginBottom: 4 }}>Total Test Cases</div>
-          <div style={{ fontSize: 36, fontWeight: 800, color: '#00B0F0' }}>{total}</div>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>Test cases in system</div>
+        <div style={{ background: '#FFFFFF', borderRadius: 10, padding: 20, border: '1px solid #E0E8F0' }}>
+          <div style={{ fontSize: 11, color: '#6B7280', fontWeight: 600, marginBottom: 4 }}>Total Test Cases</div>
+          <div style={{ fontSize: 36, fontWeight: 800, color: '#0066CC' }}>{total}</div>
+          <div style={{ fontSize: 10, color: '#9CA3AF' }}>Test cases in system</div>
         </div>
 
         {/* Lines of Business */}
-        <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 10, padding: 20, border: '1px solid rgba(255,255,255,0.08)' }}>
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', fontWeight: 600, marginBottom: 4 }}>Lines of Business</div>
-          <div style={{ fontSize: 36, fontWeight: 800, color: '#2ecc71' }}>{lobCount}</div>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>Unique LoBs</div>
+        <div style={{ background: '#FFFFFF', borderRadius: 10, padding: 20, border: '1px solid #E0E8F0' }}>
+          <div style={{ fontSize: 11, color: '#6B7280', fontWeight: 600, marginBottom: 4 }}>Lines of Business</div>
+          <div style={{ fontSize: 36, fontWeight: 800, color: '#16A34A' }}>{lobCount}</div>
+          <div style={{ fontSize: 10, color: '#9CA3AF' }}>Unique LoBs</div>
         </div>
 
         {/* Test Case Status */}
-        <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 10, padding: 20, border: '1px solid rgba(255,255,255,0.08)' }}>
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', fontWeight: 600, marginBottom: 8 }}>Test Case Status</div>
+        <div style={{ background: '#FFFFFF', borderRadius: 10, padding: 20, border: '1px solid #E0E8F0' }}>
+          <div style={{ fontSize: 11, color: '#6B7280', fontWeight: 600, marginBottom: 8 }}>Test Case Status</div>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
             <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 18, fontWeight: 700, color: '#22c55e' }}>{closed}</div>
-              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Closed</div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: '#16A34A' }}>{closed}</div>
+              <div style={{ fontSize: 9, color: '#9CA3AF' }}>Closed</div>
             </div>
             <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 18, fontWeight: 700, color: '#f59e0b' }}>{open}</div>
-              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Open</div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: '#D97706' }}>{open}</div>
+              <div style={{ fontSize: 9, color: '#9CA3AF' }}>Open</div>
             </div>
             <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 18, fontWeight: 700, color: '#ef4444' }}>{defects}</div>
-              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Defects</div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: '#DC2626' }}>{defects}</div>
+              <div style={{ fontSize: 9, color: '#9CA3AF' }}>Defects</div>
             </div>
           </div>
           {/* Status bar */}
-          <div style={{ display: 'flex', borderRadius: 6, overflow: 'hidden', height: 10 }}>
-            {closedPct > 0 && <div style={{ width: `${closedPct}%`, background: '#22c55e' }} />}
-            {openPct > 0 && <div style={{ width: `${openPct}%`, background: '#00B0F0' }} />}
-            {defectPct > 0 && <div style={{ width: `${defectPct}%`, background: '#ef4444' }} />}
+          <div style={{ display: 'flex', borderRadius: 6, overflow: 'hidden', height: 10, background: '#E5E7EB' }}>
+            {closedPct > 0 && <div style={{ width: `${closedPct}%`, background: '#16A34A' }} />}
+            {openPct > 0 && <div style={{ width: `${openPct}%`, background: '#0066CC' }} />}
+            {defectPct > 0 && <div style={{ width: `${defectPct}%`, background: '#DC2626' }} />}
           </div>
           {/* Completion badge */}
-          <div style={{ marginTop: 10, textAlign: 'center', background: 'rgba(0,176,240,0.15)', borderRadius: 6, padding: '6px 10px' }}>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>Completion:</div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: '#00B0F0' }}>{completionPct}% ({closed}/{total})</div>
+          <div style={{ marginTop: 10, textAlign: 'center', background: '#E0F2FE', borderRadius: 6, padding: '6px 10px' }}>
+            <div style={{ fontSize: 10, color: '#6B7280' }}>Completion:</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#0066CC' }}>{completionPct}% ({closed}/{total})</div>
           </div>
         </div>
 
         {/* Priority Distribution */}
-        <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 10, padding: 20, border: '1px solid rgba(255,255,255,0.08)' }}>
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', fontWeight: 600, marginBottom: 8 }}>Priority Distribution</div>
+        <div style={{ background: '#FFFFFF', borderRadius: 10, padding: 20, border: '1px solid #E0E8F0' }}>
+          <div style={{ fontSize: 11, color: '#6B7280', fontWeight: 600, marginBottom: 8 }}>Priority Distribution</div>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 22, fontWeight: 700, color: '#ef4444' }}>{high}</div>
-              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>High</div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: '#DC2626' }}>{high}</div>
+              <div style={{ fontSize: 9, color: '#9CA3AF' }}>High</div>
             </div>
             <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 22, fontWeight: 700, color: '#f59e0b' }}>{medium}</div>
-              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Medium</div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: '#D97706' }}>{medium}</div>
+              <div style={{ fontSize: 9, color: '#9CA3AF' }}>Medium</div>
             </div>
             <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 22, fontWeight: 700, color: '#22c55e' }}>{low}</div>
-              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Low</div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: '#16A34A' }}>{low}</div>
+              <div style={{ fontSize: 9, color: '#9CA3AF' }}>Low</div>
             </div>
           </div>
         </div>
       </div>
 
       {/* ──── LOB Wise Test Case Distribution ─────────────────────────────────── */}
-      <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 12, padding: 24 }}>
-        <h2 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 16px' }}>LOB Wise Test Case Distribution</h2>
+      <div style={{ background: '#FFFFFF', borderRadius: 12, padding: 24, border: '1px solid #E0E8F0' }}>
+        <h2 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 16px', color: '#001F5B' }}>LOB Wise Test Case Distribution</h2>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
-              <tr style={{ background: 'rgba(0,176,240,0.15)' }}>
+              <tr style={{ background: '#F4F6FA' }}>
                 {['LOB', 'OPEN', 'REOPENED', 'CLOSED', 'CANCELLED', 'READY_FOR_TESTING', 'NEEDS_FIX', 'DEFECT'].map(h => (
-                  <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, fontSize: 11, color: 'rgba(255,255,255,0.7)', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>{h}</th>
+                  <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, fontSize: 11, color: '#001F5B', borderBottom: '1px solid #E0E8F0' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {lobDist.map((r, i) => (
-                <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                  <td style={{ padding: '10px 14px', fontWeight: 600 }}>{r.lob}</td>
-                  <td style={{ padding: '10px 14px', color: '#ef4444', fontWeight: 600 }}>{r.open || 0}</td>
-                  <td style={{ padding: '10px 14px' }}>{r.reopened || 0}</td>
-                  <td style={{ padding: '10px 14px', color: '#22c55e', fontWeight: 600 }}>{r.closed || 0}</td>
-                  <td style={{ padding: '10px 14px' }}>{r.cancelled || 0}</td>
-                  <td style={{ padding: '10px 14px' }}>{r.ready_for_testing || 0}</td>
-                  <td style={{ padding: '10px 14px' }}>{r.needs_fix || 0}</td>
-                  <td style={{ padding: '10px 14px' }}>{r.defect || 0}</td>
+                <tr key={i} style={{ borderBottom: '1px solid #F0F0F0' }}>
+                  <td style={{ padding: '10px 14px', fontWeight: 600, color: '#222222' }}>{r.lob}</td>
+                  <td style={{ padding: '10px 14px', color: '#DC2626', fontWeight: 600 }}>{r.open || 0}</td>
+                  <td style={{ padding: '10px 14px', color: '#222222' }}>{r.reopened || 0}</td>
+                  <td style={{ padding: '10px 14px', color: '#16A34A', fontWeight: 600 }}>{r.closed || 0}</td>
+                  <td style={{ padding: '10px 14px', color: '#222222' }}>{r.cancelled || 0}</td>
+                  <td style={{ padding: '10px 14px', color: '#222222' }}>{r.ready_for_testing || 0}</td>
+                  <td style={{ padding: '10px 14px', color: '#222222' }}>{r.needs_fix || 0}</td>
+                  <td style={{ padding: '10px 14px', color: '#222222' }}>{r.defect || 0}</td>
                 </tr>
               ))}
               {/* Totals row */}
-              <tr style={{ borderTop: '2px solid rgba(255,255,255,0.15)', fontWeight: 700 }}>
-                <td style={{ padding: '10px 14px' }}>TOTAL</td>
-                <td style={{ padding: '10px 14px', color: '#ef4444' }}>{lobTotals.open}</td>
-                <td style={{ padding: '10px 14px' }}>{lobTotals.reopened}</td>
-                <td style={{ padding: '10px 14px', color: '#22c55e' }}>{lobTotals.closed}</td>
-                <td style={{ padding: '10px 14px' }}>{lobTotals.cancelled}</td>
-                <td style={{ padding: '10px 14px' }}>{lobTotals.ready_for_testing}</td>
-                <td style={{ padding: '10px 14px' }}>{lobTotals.needs_fix}</td>
-                <td style={{ padding: '10px 14px' }}>{lobTotals.defect}</td>
+              <tr style={{ borderTop: '2px solid #E0E8F0', fontWeight: 700 }}>
+                <td style={{ padding: '10px 14px', color: '#222222' }}>TOTAL</td>
+                <td style={{ padding: '10px 14px', color: '#DC2626' }}>{lobTotals.open}</td>
+                <td style={{ padding: '10px 14px', color: '#222222' }}>{lobTotals.reopened}</td>
+                <td style={{ padding: '10px 14px', color: '#16A34A' }}>{lobTotals.closed}</td>
+                <td style={{ padding: '10px 14px', color: '#222222' }}>{lobTotals.cancelled}</td>
+                <td style={{ padding: '10px 14px', color: '#222222' }}>{lobTotals.ready_for_testing}</td>
+                <td style={{ padding: '10px 14px', color: '#222222' }}>{lobTotals.needs_fix}</td>
+                <td style={{ padding: '10px 14px', color: '#222222' }}>{lobTotals.defect}</td>
               </tr>
             </tbody>
           </table>

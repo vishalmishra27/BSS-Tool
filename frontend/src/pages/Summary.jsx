@@ -1,261 +1,207 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useAuth } from '../context/AuthContext';
+import { colors, font } from '../theme';
+
+function useApi() {
+  const { auth, logout } = useAuth();
+  const token = auth?.token;
+  return useCallback(async (path) => {
+    const res = await fetch(`/api/bpm${path}`, {
+      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    });
+    if (res.status === 401) { logout(); throw new Error('Session expired'); }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+    return data;
+  }, [token, logout]);
+}
+
+const STATUS_LABEL = { todo: 'To Do', in_progress: 'In Progress', blocked: 'Blocked', done: 'Done' };
+const STATUS_COLOR = { todo: colors.kpmgBlueLight, in_progress: colors.amber, blocked: colors.red, done: colors.green };
+
+const card = {
+  background: colors.bgCard,
+  borderRadius: 10,
+  padding: 20,
+  border: `1px solid ${colors.border}`,
+};
+
+const cardLabel = { fontSize: 11, color: colors.gray500, fontWeight: 600, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.4 };
+const statRow = { display: 'flex', justifyContent: 'space-between', fontSize: 14, padding: '6px 0', borderBottom: `1px solid ${colors.borderLight}` };
 
 const Summary = () => {
+  const api = useApi();
+  const [projects, setProjects] = useState([]);
+  const [tasks, setTasks] = useState([]);
+  const [err, setErr] = useState('');
+  const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState(null);
 
-  // Sample user data with their tasks
-  const userData = [
-    {
-      id: 1,
-      name: 'Alana Song',
-      avatar: 'https://randomuser.me/api/portraits/women/65.jpg',
-      role: 'Project Manager',
-      tasks: [
-        { id: 'T-001', title: 'Review Q4 budget proposal', status: 'In Progress', priority: 'High', dueDate: '2024-01-15' },
-        { id: 'T-002', title: 'Finalize marketing campaign', status: 'To Do', priority: 'Medium', dueDate: '2024-01-20' },
-        { id: 'T-003', title: 'Team performance review', status: 'Completed', priority: 'Low', dueDate: '2024-01-10' }
-      ]
-    },
-    {
-      id: 2,
-      name: 'Jie Yan',
-      avatar: 'https://randomuser.me/api/portraits/children/2.jpg',
-      role: 'Developer',
-      tasks: [
-        { id: 'T-004', title: 'Implement new API endpoints', status: 'In Progress', priority: 'High', dueDate: '2024-01-18' },
-        { id: 'T-005', title: 'Fix login bug', status: 'Completed', priority: 'Medium', dueDate: '2024-01-12' },
-        { id: 'T-006', title: 'Code review for PR #123', status: 'To Do', priority: 'Medium', dueDate: '2024-01-22' }
-      ]
-    },
-    {
-      id: 3,
-      name: 'Fran Perez',
-      avatar: 'https://randomuser.me/api/portraits/men/45.jpg',
-      role: 'Designer',
-      tasks: [
-        { id: 'T-007', title: 'Create new dashboard mockup', status: 'In Progress', priority: 'High', dueDate: '2024-01-16' },
-        { id: 'T-008', title: 'Update brand guidelines', status: 'To Do', priority: 'Low', dueDate: '2024-01-25' }
-      ]
-    },
-    {
-      id: 4,
-      name: 'Amar Sundaram',
-      avatar: 'https://randomuser.me/api/portraits/men/32.jpg',
-      role: 'QA Engineer',
-      tasks: [
-        { id: 'T-009', title: 'Test new feature release', status: 'In Progress', priority: 'High', dueDate: '2024-01-17' },
-        { id: 'T-010', title: 'Regression testing', status: 'Completed', priority: 'Medium', dueDate: '2024-01-14' }
-      ]
-    }
-  ];
+  useEffect(() => {
+    Promise.all([api('/projects'), api('/tasks')])
+      .then(([p, t]) => { setProjects(p); setTasks(t); })
+      .catch(e => setErr(e.message))
+      .finally(() => setLoading(false));
+  }, [api]);
 
-  const getStatusColor = (status) => {
-    switch(status) {
-      case 'Completed': return '#4ade80';
-      case 'In Progress': return '#f97316';
-      case 'To Do': return '#3b82f6';
-      default: return '#6b7280';
-    }
-  };
+  if (loading) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: colors.bgPage, color: colors.kpmgBlue, fontFamily: font.family }}>
+        Loading...
+      </div>
+    );
+  }
 
-  const getPriorityColor = (priority) => {
-    switch(priority) {
-      case 'High': return '#ef4444';
-      case 'Medium': return '#f97316';
-      case 'Low': return '#3b82f6';
-      default: return '#6b7280';
+  // ─── Project summary ─────────────────────────────────────────────────────────
+  const totalProjects = projects.length;
+  const projectsInProgress = projects.filter(p => p.status === 'active').length;
+  const projectsCompleted = projects.filter(p => p.status === 'completed').length;
+  const projectsOnHold = projects.filter(p => p.status === 'on_hold').length;
+
+  // ─── Task summary ─────────────────────────────────────────────────────────────
+  const totalTasks = tasks.length;
+  const todoTasks = tasks.filter(t => t.status === 'todo').length;
+  const inProgressTasks = tasks.filter(t => t.status === 'in_progress').length;
+  const blockedTasks = tasks.filter(t => t.status === 'blocked').length;
+  const doneTasks = tasks.filter(t => t.status === 'done').length;
+  const pendingTasks = totalTasks - doneTasks;
+  const completionRate = totalTasks ? Math.round((doneTasks / totalTasks) * 100) : 0;
+
+  // ─── User task summary — group tasks by assignee ─────────────────────────────
+  const userMap = new Map();
+  tasks.forEach(t => {
+    if (!t.assignee_id) return;
+    if (!userMap.has(t.assignee_id)) {
+      userMap.set(t.assignee_id, { id: t.assignee_id, name: t.assignee_name, role: t.assignee_role, tasks: [] });
     }
-  };
+    userMap.get(t.assignee_id).tasks.push(t);
+  });
+  const userData = Array.from(userMap.values());
 
   return (
-    <div style={{ padding: '2rem', fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif", height: '100vh', overflowY: 'auto' }}>
-      <h1 style={{ color: '#1e3c72', marginBottom: '1.5rem' }}>BPM Summary</h1>
-     
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-        gap: '1.5rem',
-        marginBottom: '2rem'
-      }}>
-        <div style={{
-          background: '#fff',
-          padding: '1.5rem',
-          borderRadius: '12px',
-          boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-          border: '1px solid #e1e4eb'
-        }}>
-          <h3 style={{ color: '#1e3c72', marginBottom: '1rem' }}>Process Summary</h3>
-          <div style={{ display: 'grid', gap: '0.5rem' }}>
-            <div><strong>Total Processes:</strong> 24</div>
-            <div><strong>Active Processes:</strong> 12</div>
-            <div><strong>Completed Processes:</strong> 8</div>
-            <div><strong>Pending Review:</strong> 4</div>
-          </div>
+    <div style={{ minHeight: '100vh', background: colors.bgPage, color: colors.gray900, fontFamily: font.family, overflowY: 'auto', padding: '24px 28px' }}>
+
+      {/* Header */}
+      <div style={{ textAlign: 'center', marginBottom: 28 }}>
+        <h1 style={{ fontSize: 28, fontWeight: 700, margin: 0, color: colors.navy }}>BPM Summary</h1>
+        <p style={{ color: colors.gray500, fontSize: 13, margin: '4px 0 0' }}>Live overview of projects, tasks and team workload</p>
+      </div>
+
+      {err && (
+        <div style={{ background: colors.redLight, color: colors.red, border: `1px solid ${colors.red}`, padding: '10px 14px', borderRadius: 8, marginBottom: 20, fontSize: 13, maxWidth: 1200, marginLeft: 'auto', marginRight: 'auto' }}>
+          {err}
         </div>
-       
-        <div style={{
-          background: '#fff',
-          padding: '1.5rem',
-          borderRadius: '12px',
-          boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-          border: '1px solid #e1e4eb'
-        }}>
-          <h3 style={{ color: '#1e3c72', marginBottom: '1rem' }}>Project Summary</h3>
-          <div style={{ display: 'grid', gap: '0.5rem' }}>
-            <div><strong>Total Projects:</strong> 8</div>
-            <div><strong>In Progress:</strong> 5</div>
-            <div><strong>Completed:</strong> 2</div>
-            <div><strong>On Hold:</strong> 1</div>
-          </div>
+      )}
+
+      {/* ──── Summary cards ──────────────────────────────────────────────────── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16, marginBottom: 20 }}>
+        <div style={card}>
+          <div style={cardLabel}>Project Summary</div>
+          <div style={{ fontSize: 36, fontWeight: 800, color: colors.kpmgBlueLight, marginBottom: 8 }}>{totalProjects}</div>
+          <div style={statRow}><span>In Progress</span><strong style={{ color: colors.kpmgBlueLight }}>{projectsInProgress}</strong></div>
+          <div style={statRow}><span>Completed</span><strong style={{ color: colors.green }}>{projectsCompleted}</strong></div>
+          <div style={{ ...statRow, borderBottom: 'none' }}><span>On Hold</span><strong style={{ color: colors.amber }}>{projectsOnHold}</strong></div>
         </div>
-       
-        <div style={{
-          background: '#fff',
-          padding: '1.5rem',
-          borderRadius: '12px',
-          boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-          border: '1px solid #e1e4eb'
-        }}>
-          <h3 style={{ color: '#1e3c72', marginBottom: '1rem' }}>Task Summary</h3>
-          <div style={{ display: 'grid', gap: '0.5rem' }}>
-            <div><strong>Total Tasks:</strong> 15</div>
-            <div><strong>To Do:</strong> 5</div>
-            <div><strong>In Progress:</strong> 7</div>
-            <div><strong>Completed:</strong> 3</div>
+
+        <div style={card}>
+          <div style={cardLabel}>Task Summary</div>
+          <div style={{ fontSize: 36, fontWeight: 800, color: colors.kpmgBlueLight, marginBottom: 8 }}>{totalTasks}</div>
+          <div style={statRow}><span>To Do</span><strong style={{ color: colors.gray700 }}>{todoTasks}</strong></div>
+          <div style={statRow}><span>In Progress</span><strong style={{ color: colors.kpmgBlueLight }}>{inProgressTasks}</strong></div>
+          <div style={statRow}><span>Blocked</span><strong style={{ color: colors.red }}>{blockedTasks}</strong></div>
+          <div style={{ ...statRow, borderBottom: 'none' }}><span>Completed</span><strong style={{ color: colors.green }}>{doneTasks}</strong></div>
+        </div>
+
+        <div style={card}>
+          <div style={cardLabel}>Completion Rate</div>
+          <div style={{ fontSize: 36, fontWeight: 800, color: colors.green, marginBottom: 8 }}>{completionRate}%</div>
+          <div style={{ display: 'flex', borderRadius: 6, overflow: 'hidden', height: 10, background: colors.gray100 }}>
+            {completionRate > 0 && <div style={{ width: `${completionRate}%`, background: colors.green }} />}
           </div>
+          <div style={{ fontSize: 11, color: colors.gray500, marginTop: 8 }}>{doneTasks} of {totalTasks} tasks done</div>
+        </div>
+
+        <div style={card}>
+          <div style={cardLabel}>Pending Tasks</div>
+          <div style={{ fontSize: 36, fontWeight: 800, color: colors.amber, marginBottom: 8 }}>{pendingTasks}</div>
+          <div style={{ fontSize: 11, color: colors.gray500 }}>Not yet marked done</div>
         </div>
       </div>
 
-      <div style={{
-        background: '#fff',
-        padding: '2rem',
-        borderRadius: '12px',
-        boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-        border: '1px solid #e1e4eb',
-        marginBottom: '2rem'
-      }}>
-        <h3 style={{ color: '#1e3c72', marginBottom: '1rem' }}>Performance Overview</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-          <div style={{ textAlign: 'center', padding: '1rem', background: '#f8f9fa', borderRadius: '8px' }}>
-            <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#1e3c72' }}>92%</div>
-            <div style={{ color: '#666' }}>Completion Rate</div>
-          </div>
-          <div style={{ textAlign: 'center', padding: '1rem', background: '#f8f9fa', borderRadius: '8px' }}>
-            <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#1e3c72' }}>87%</div>
-            <div style={{ color: '#666' }}>Efficiency Rate</div>
-          </div>
-          <div style={{ textAlign: 'center', padding: '1rem', background: '#f8f9fa', borderRadius: '8px' }}>
-            <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#1e3c72' }}>5</div>
-            <div style={{ color: '#666' }}>Pending Improvements</div>
-          </div>
-        </div>
-      </div>
+      {/* ──── User task summary ──────────────────────────────────────────────── */}
+      <div style={card}>
+        <h2 style={{ fontSize: 16, fontWeight: 700, color: colors.navy, margin: '0 0 16px' }}>User Task Summary</h2>
 
-      <div style={{
-        background: '#fff',
-        padding: '2rem',
-        borderRadius: '12px',
-        boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-        border: '1px solid #e1e4eb'
-      }}>
-        <h3 style={{ color: '#1e3c72', marginBottom: '1.5rem' }}>User Task Summary</h3>
-       
+        {userData.length === 0 && <p style={{ color: colors.gray500, fontSize: 13 }}>No assigned tasks yet.</p>}
+
         {selectedUser ? (
           <div>
             <button
               onClick={() => setSelectedUser(null)}
               style={{
-                background: '#1e3c72',
-                color: 'white',
+                background: colors.kpmgBlue,
+                color: colors.white,
                 border: 'none',
-                padding: '0.5rem 1rem',
-                borderRadius: '6px',
+                padding: '8px 16px',
+                borderRadius: 8,
                 cursor: 'pointer',
-                marginBottom: '1rem'
+                fontSize: 13,
+                fontWeight: 600,
+                marginBottom: 16,
               }}
             >
               ← Back to Users
             </button>
-           
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1rem' }}>
-              <img
-                src={selectedUser.avatar}
-                alt={selectedUser.name}
-                style={{ width: '50px', height: '50px', borderRadius: '50%', marginRight: '1rem' }}
-              />
-              <div>
-                <h4 style={{ margin: 0, color: '#1e3c72' }}>{selectedUser.name}</h4>
-                <p style={{ margin: 0, color: '#666' }}>{selectedUser.role}</p>
-              </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <h3 style={{ margin: 0, fontSize: 16, color: colors.navy }}>{selectedUser.name}</h3>
+              <p style={{ margin: '2px 0 0', color: colors.gray500, fontSize: 13 }}>{selectedUser.role}</p>
             </div>
-           
-            <div style={{ display: 'grid', gap: '1rem' }}>
+
+            <div style={{ display: 'grid', gap: 12 }}>
               {selectedUser.tasks.map(task => (
                 <div key={task.id} style={{
-                  padding: '1rem',
-                  background: '#f8f9fa',
-                  borderRadius: '8px',
-                  borderLeft: `4px solid ${getStatusColor(task.status)}`
+                  padding: 14,
+                  background: colors.grayBg,
+                  borderRadius: 8,
+                  borderLeft: `4px solid ${STATUS_COLOR[task.status]}`,
                 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                    <strong style={{ color: '#1e3c72' }}>{task.title}</strong>
-                    <span style={{
-                      padding: '0.25rem 0.5rem',
-                      borderRadius: '12px',
-                      backgroundColor: getPriorityColor(task.priority),
-                      color: 'white',
-                      fontSize: '0.8rem'
-                    }}>
-                      {task.priority}
-                    </span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <strong style={{ color: colors.navy, fontSize: 14 }}>{task.title}</strong>
+                    <span style={{ color: colors.gray500, fontSize: 12 }}>{task.project_name}</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#666', fontSize: '0.9rem' }}>
-                    <span>Status: {task.status}</span>
-                    <span>Due: {task.dueDate}</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: colors.gray500, fontSize: 12 }}>
+                    <span style={{ color: STATUS_COLOR[task.status], fontWeight: 600 }}>{STATUS_LABEL[task.status]}</span>
+                    <span>Due: {task.end_date || '—'}</span>
                   </div>
                 </div>
               ))}
             </div>
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
             {userData.map(user => (
               <div
                 key={user.id}
                 style={{
-                  padding: '1.5rem',
-                  background: '#f8f9fa',
-                  borderRadius: '12px',
+                  padding: 16,
+                  background: colors.grayBg,
+                  borderRadius: 10,
                   cursor: 'pointer',
-                  transition: 'transform 0.2s, box-shadow 0.2s',
-                  border: '1px solid #e1e4eb'
+                  border: `1px solid ${colors.border}`,
+                  transition: 'box-shadow 0.15s',
                 }}
                 onClick={() => setSelectedUser(user)}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = 'none';
-                }}
+                onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,31,91,0.10)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.boxShadow = 'none'; }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1rem' }}>
-                  <img
-                    src={user.avatar}
-                    alt={user.name}
-                    style={{ width: '40px', height: '40px', borderRadius: '50%', marginRight: '1rem' }}
-                  />
-                  <div>
-                    <h4 style={{ margin: 0, color: '#1e3c72' }}>{user.name}</h4>
-                    <p style={{ margin: 0, color: '#666', fontSize: '0.9rem' }}>{user.role}</p>
-                  </div>
-                </div>
-                <div style={{ display: 'grid', gap: '0.5rem', fontSize: '0.9rem' }}>
-                  <div><strong>Tasks:</strong> {user.tasks.length}</div>
-                  <div><strong>In Progress:</strong> {user.tasks.filter(t => t.status === 'In Progress').length}</div>
-                  <div><strong>Completed:</strong> {user.tasks.filter(t => t.status === 'Completed').length}</div>
-                  <div><strong>Due Soon:</strong> {user.tasks.filter(t => t.status !== 'Completed').length}</div>
+                <h4 style={{ margin: 0, fontSize: 14, color: colors.navy }}>{user.name}</h4>
+                <p style={{ margin: '2px 0 12px', color: colors.gray500, fontSize: 12 }}>{user.role}</p>
+                <div style={{ display: 'grid', gap: 6, fontSize: 13 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Tasks</span><strong>{user.tasks.length}</strong></div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>In Progress</span><strong style={{ color: colors.kpmgBlueLight }}>{user.tasks.filter(t => t.status === 'in_progress').length}</strong></div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Completed</span><strong style={{ color: colors.green }}>{user.tasks.filter(t => t.status === 'done').length}</strong></div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Pending</span><strong style={{ color: colors.amber }}>{user.tasks.filter(t => t.status !== 'done').length}</strong></div>
                 </div>
               </div>
             ))}

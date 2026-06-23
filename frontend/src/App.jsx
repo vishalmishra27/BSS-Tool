@@ -128,11 +128,8 @@ const ALL_NAV_ITEMS = [
     children: [{ label: 'Product Journey', path: '/product-dashboard' }],
   },
   {
-    label: 'UAT', path: '/uat', icon: <IconUAT />, module: 'uat', dot: true,
-    children: [
-      { label: 'UAT Dashboard',    path: '/uat' },
-      { label: 'UAT Automation',   path: '/uat/automation' },
-    ],
+    label: 'UAT Dashboard', path: '/uat', icon: <IconUAT />, module: 'uat', dot: true,
+
   },
   {
     label: 'Enterprise', path: '/enterprise/bpm', icon: <IconEnterprise />, module: 'dashboard', dot: true,
@@ -144,13 +141,14 @@ const ALL_NAV_ITEMS = [
   { label: 'UAT Automation', path: '/uat-automation', icon: <IconUATAuto />, module: 'dashboard', dot: true },
   { label: 'Migration', path: '/migration', icon: <IconMigration />,module: 'dashboard', dot: true },
   {
-    label: 'AI Agents', path: '/agent', icon: <IconAgent />, module: 'dashboard',
+    label: 'AI Agents', path: '/agent/about', icon: <IconAgent />, module: 'dashboard',
     children: [
-      { label: 'Agent Chat', path: '/agent' },
       { label: 'Agent Descriptions', path: '/agent/about' },
+      { label: 'Agent Chat', path: '/agent' },
+      
     ],
   },
-  { label: 'Audit Log', path: '/audit-log', icon: <IconAudit />,    module: 'audit_log' },
+  //{ label: 'Audit Log', path: '/audit-log', icon: <IconAudit />,    module: 'audit_log' },
 ];
 
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
@@ -188,24 +186,49 @@ function Sidebar({ onLogout }) {
           return (
             <div key={item.label}>
               <div style={{ display: 'flex', alignItems: 'center' }}>
-                <NavLink to={item.path} style={({ isActive: na }) => ({
-                  display: 'flex', alignItems: 'center', gap: 10,
-                  padding: isCollapsed ? '10px 0' : '10px 14px',
-                  justifyContent: isCollapsed ? 'center' : 'flex-start',
-                  color: isActive || na ? '#ffffff' : 'rgba(255,255,255,0.65)',
-                  textDecoration: 'none', fontSize: 13, fontWeight: isActive ? 600 : 400,
-                  background: isActive ? 'rgba(255,255,255,0.12)' : 'transparent',
-                  borderLeft: isActive ? '3px solid #00B0F0' : '3px solid transparent',
-                  flex: 1, minWidth: 0, transition: 'all 0.15s', whiteSpace: 'nowrap', overflow: 'hidden',
-                })}>
-                  <span style={{ flexShrink: 0 }}>{item.icon}</span>
-                  {!isCollapsed && (
-                    <>
-                      <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.label}</span>
-                      {item.dot && <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#00B0F0', flexShrink: 0, marginRight: 2 }} />}
-                    </>
-                  )}
-                </NavLink>
+                {item.children ? (
+                  <div
+                    onClick={() => setExpanded(p => ({ ...p, [item.label]: !p[item.label] }))}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 10,
+                      padding: isCollapsed ? '10px 0' : '10px 14px',
+                      justifyContent: isCollapsed ? 'center' : 'flex-start',
+                      color: isActive ? '#ffffff' : 'rgba(255,255,255,0.65)',
+                      cursor: 'pointer',
+                      fontSize: 13, fontWeight: isActive ? 600 : 400,
+                      background: isActive ? 'rgba(255,255,255,0.12)' : 'transparent',
+                      borderLeft: isActive ? '3px solid #00B0F0' : '3px solid transparent',
+                      flex: 1, minWidth: 0, transition: 'all 0.15s', whiteSpace: 'nowrap', overflow: 'hidden',
+                    }}
+                  >
+                    <span style={{ flexShrink: 0 }}>{item.icon}</span>
+                    {!isCollapsed && (
+                      <>
+                        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.label}</span>
+                        {item.dot && <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#00B0F0', flexShrink: 0, marginRight: 2 }} />}
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  <NavLink to={item.path} style={({ isActive: na }) => ({
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    padding: isCollapsed ? '10px 0' : '10px 14px',
+                    justifyContent: isCollapsed ? 'center' : 'flex-start',
+                    color: isActive || na ? '#ffffff' : 'rgba(255,255,255,0.65)',
+                    textDecoration: 'none', fontSize: 13, fontWeight: isActive ? 600 : 400,
+                    background: isActive ? 'rgba(255,255,255,0.12)' : 'transparent',
+                    borderLeft: isActive ? '3px solid #00B0F0' : '3px solid transparent',
+                    flex: 1, minWidth: 0, transition: 'all 0.15s', whiteSpace: 'nowrap', overflow: 'hidden',
+                  })}>
+                    <span style={{ flexShrink: 0 }}>{item.icon}</span>
+                    {!isCollapsed && (
+                      <>
+                        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.label}</span>
+                        {item.dot && <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#00B0F0', flexShrink: 0, marginRight: 2 }} />}
+                      </>
+                    )}
+                  </NavLink>
+                )}
                 {!isCollapsed && item.children && (
                   <button onClick={() => setExpanded(p => ({ ...p, [item.label]: !p[item.label] }))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.5)', padding: '10px 8px', fontSize: 10 }}>
                     {isExpanded ? '▲' : '▼'}
@@ -297,8 +320,8 @@ function AuthGate() {
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#001F5B' }}>
-        <div style={{ color: '#00B0F0', fontSize: 16 }}>Loading…</div>
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F4F6FA' }}>
+        <div style={{ color: '#003087', fontSize: 16, fontWeight: 600 }}>Loading…</div>
       </div>
     );
   }
