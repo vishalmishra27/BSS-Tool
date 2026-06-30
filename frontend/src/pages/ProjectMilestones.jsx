@@ -495,8 +495,8 @@ const handleNodeClick = (node) => {
         <div className="mb-8">
           <div className="flex justify-between items-center mb-6">
             <div>
-              <h1 className="text-4xl font-bold text-[#001F5B] mb-3 tracking-tight">Project Milestones</h1>
-              <p className="text-[#6B7280] text-lg">Click a stage to view its details and checklist</p>
+              <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, color: '#001F5B' }}>Project Milestones</h1>
+              <p style={{ fontSize: 13, color: '#666', margin: '4px 0 0' }}>Click a stage to view its details and checklist</p>
             </div>
             {/* Dropdown filter */}
             <div className="relative">

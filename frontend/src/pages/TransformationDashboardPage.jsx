@@ -268,12 +268,9 @@ const TransformationDashboardPage = () => {
       overflowX: 'hidden',
       overflowY: 'auto',
     },
-    header: { textAlign: 'center', marginBottom: '1.5rem' },
-    title: {
-      fontSize: '2.2rem', fontWeight: '700', marginBottom: '0.5rem',
-      color: '#1e40af', textShadow: '0 2px 4px rgba(30, 64, 175, 0.1)',
-    },
-    subtitle: { fontSize: '1.1rem', color: '#3b82f6', marginBottom: '1.5rem', fontWeight: '500' },
+    header: { textAlign: 'left', marginBottom: '1.5rem' },
+    title: { fontSize: 22, fontWeight: 700, margin: 0, color: '#001F5B' },
+    subtitle: { fontSize: 13, color: '#666', margin: '4px 0 0' },
     statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem', marginBottom: '1.5rem' },
     kpiCard: {
       background: 'linear-gradient(135deg, #1e40af 0%, #3b82f6 100%)',
