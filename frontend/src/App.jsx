@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, NavLink, useLocation } from 'react-router
 import { LoadingProvider } from './context/LoadingContext';
 import { SidebarProvider, useSidebar } from './context/SidebarContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import logo from "./public/logo.png";
 
 // Pages
 import LoginPage from './pages/LoginPage';
@@ -168,15 +169,45 @@ function Sidebar({ onLogout }) {
       transition: 'width 0.25s ease', overflow: 'hidden',
       flexShrink: 0, zIndex: 100, position: 'relative',
     }}>
-      {/* KPMG Logo */}
-      <div style={{ padding: isCollapsed ? '16px 8px' : '16px 16px', borderBottom: '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: isCollapsed ? 'center' : 'space-between', gap: 8 }}>
-        {!isCollapsed && (
-          <div style={{ background: '#003087', color: '#00B0F0', fontWeight: 900, fontSize: 22, letterSpacing: 2, padding: '2px 8px', border: '2px solid #00B0F0', userSelect: 'none' }}>KPMG</div>
-        )}
-        <button onClick={toggleSidebar} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.7)', padding: 4, borderRadius: 4, display: 'flex', alignItems: 'center' }}>
-          <IconChevron collapsed={isCollapsed} />
-        </button>
-      </div>
+      {/* Logo */}
+<div
+  style={{
+    padding: isCollapsed ? '16px 8px' : '16px 16px',
+    borderBottom: '1px solid rgba(255,255,255,0.1)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: isCollapsed ? 'center' : 'space-between',
+    gap: 8,
+  }}
+>
+  {!isCollapsed && (
+    <img
+      src={logo}
+      alt="KPMG Logo"
+      style={{
+        height: '60px',
+        width: 'auto',
+        objectFit: 'contain',
+      }}
+    />
+  )}
+
+  <button
+    onClick={toggleSidebar}
+    style={{
+      background: 'none',
+      border: 'none',
+      cursor: 'pointer',
+      color: 'rgba(255,255,255,0.7)',
+      padding: 4,
+      borderRadius: 4,
+      display: 'flex',
+      alignItems: 'center',
+    }}
+  >
+    <IconChevron collapsed={isCollapsed} />
+  </button>
+</div>
 
       {/* Nav items */}
       <nav style={{ flex: 1, paddingTop: 8 }}>

@@ -1011,8 +1011,8 @@ const StatusTrackerPage = () => {
               </svg>
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Status Tracker</h1>
-              <p className="text-gray-600">Monitor and manage your project activities</p>
+              <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, color: '#001F5B' }}>Status Tracker</h1>
+              <p style={{ fontSize: 13, color: '#666', margin: '4px 0 0' }}>Monitor and manage your project activities</p>
             </div>
           </div>
 

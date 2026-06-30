@@ -56,9 +56,9 @@ export default function UATDashboardPage() {
     <div style={{ minHeight: '100vh', background: '#F4F6FA', color: '#222222', fontFamily: "'Helvetica Neue', Arial, 'Segoe UI', sans-serif", overflowY: 'auto', padding: '24px 28px' }}>
 
       {/* Header */}
-      <div style={{ textAlign: 'center', marginBottom: 28 }}>
-        <h1 style={{ fontSize: 28, fontWeight: 700, margin: 0, color: '#001F5B' }}>UAT Dashboard</h1>
-        <p style={{ color: '#6B7280', fontSize: 13, margin: '4px 0 0' }}>Comprehensive overview of User Acceptance Testing</p>
+      <div style={{ textAlign: 'left', marginBottom: 28 }}>
+        <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, color: '#001F5B' }}>UAT Dashboard</h1>
+        <p style={{ color: '#666', fontSize: 13, margin: '4px 0 0' }}>Comprehensive overview of User Acceptance Testing</p>
       </div>
 
       {/* ──── Summary Cards ───────────────────────────────────────────────────── */}
