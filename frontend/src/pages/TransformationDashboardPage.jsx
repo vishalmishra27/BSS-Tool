@@ -60,7 +60,7 @@ const ActivityRow = ({
             if (mouseLeaveTimeout) clearTimeout(mouseLeaveTimeout);
             setMouseLeaveTimeout(timeout);
           }}
-          style={{ cursor: 'pointer', display: 'inline-block', width: '100%', color: '#1e40af', textDecoration: 'underline dotted' }}
+          style={{ cursor: 'pointer', display: 'inline-block', width: '100%', color: '#00338D', textDecoration: 'underline dotted' }}
         >
           {activity}
         </span>
@@ -273,9 +273,9 @@ const TransformationDashboardPage = () => {
     subtitle: { fontSize: 13, color: '#666', margin: '4px 0 0' },
     statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem', marginBottom: '1.5rem' },
     kpiCard: {
-      background: 'linear-gradient(135deg, #1e40af 0%, #3b82f6 100%)',
+      background: 'linear-gradient(135deg, #00338D 0%, #0091DA 100%)',
       borderRadius: '12px', padding: '1.5rem', marginBottom: '1.5rem',
-      boxShadow: '0 4px 20px rgba(30, 64, 175, 0.3)', border: '1px solid #1e40af',
+      boxShadow: '0 4px 20px rgba(30, 64, 175, 0.3)', border: '1px solid #00338D',
       transition: 'transform 0.3s ease, box-shadow 0.3s ease',
       color: '#ffffff', position: 'relative', overflow: 'hidden', minHeight: '120px',
       display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
@@ -297,31 +297,31 @@ const TransformationDashboardPage = () => {
       transition: 'transform 0.3s ease, box-shadow 0.3s ease', overflow: 'hidden',
     },
     cardTitle: {
-      fontSize: '1.4rem', fontWeight: '600', marginBottom: '1rem', color: '#1e40af',
-      borderBottom: '2px solid #3b82f6', paddingBottom: '0.5rem',
+      fontSize: '1.4rem', fontWeight: '600', marginBottom: '1rem', color: '#00338D',
+      borderBottom: '2px solid #0091DA', paddingBottom: '0.5rem',
     },
     tableContainer: {
       overflowX: 'auto', borderRadius: '12px',
       boxShadow: '0 2px 12px rgba(30, 64, 175, 0.08)', border: '1px solid #e2e8f0',
     },
     table: { width: '100%', borderCollapse: 'separate', borderSpacing: 0, background: '#ffffff', minWidth: '1000px' },
-    tableHeader: { background: 'linear-gradient(135deg, #1e40af, #3b82f6)', color: '#ffffff' },
+    tableHeader: { background: 'linear-gradient(135deg, #00338D, #0091DA)', color: '#ffffff' },
     activityHeaderCell: {
       padding: '1rem 0.75rem', textAlign: 'left', fontWeight: '600', fontSize: '0.9rem', color: '#ffffff',
-      borderBottom: '2px solid #1e40af', borderTopLeftRadius: '12px',
+      borderBottom: '2px solid #00338D', borderTopLeftRadius: '12px',
     },
     lobHeaderGroup: {
-      background: 'linear-gradient(135deg, #1e40af, #3b82f6)', color: '#ffffff',
+      background: 'linear-gradient(135deg, #00338D, #0091DA)', color: '#ffffff',
       padding: '1rem 0.5rem', fontWeight: '700', fontSize: '0.9rem', textAlign: 'center',
       borderRight: '2px solid rgba(255,255,255,0.3)',
     },
     subHeaderRow: { background: '#f8fafc', borderBottom: '2px solid #e2e8f0' },
     subHeaderCell: {
-      padding: '0.75rem 0.5rem', fontSize: '0.8rem', fontWeight: '600', color: '#1e40af',
+      padding: '0.75rem 0.5rem', fontSize: '0.8rem', fontWeight: '600', color: '#00338D',
       textAlign: 'center', borderRight: '1px solid #e2e8f0', backgroundColor: '#f8fafc',
     },
     subHeaderCellFirst: {
-      padding: '0.75rem 0.5rem', fontSize: '0.8rem', fontWeight: '600', color: '#1e40af',
+      padding: '0.75rem 0.5rem', fontSize: '0.8rem', fontWeight: '600', color: '#00338D',
       textAlign: 'left', paddingLeft: '0.75rem', borderRight: '1px solid #e2e8f0', backgroundColor: '#f8fafc',
     },
     tableRow: { background: '#ffffff', borderBottom: '1px solid #e2e8f0', transition: 'all 0.3s ease', cursor: 'default' },
@@ -333,8 +333,8 @@ const TransformationDashboardPage = () => {
       color: '#1e293b', paddingLeft: '0.75rem',
     },
     plannedBox: {
-      backgroundColor: '#dbeafe', border: '1px solid #3b82f6', borderRadius: '6px',
-      padding: '0.4rem 0.5rem', fontSize: '0.8rem', fontWeight: '600', color: '#1e40af',
+      backgroundColor: '#dbeafe', border: '1px solid #0091DA', borderRadius: '6px',
+      padding: '0.4rem 0.5rem', fontSize: '0.8rem', fontWeight: '600', color: '#00338D',
       minWidth: '40px', display: 'inline-block',
     },
     actualBox: { borderRadius: '6px', padding: '0.4rem 0.5rem', fontSize: '0.8rem', fontWeight: '700', minWidth: '40px', display: 'inline-block' },
@@ -364,7 +364,7 @@ const TransformationDashboardPage = () => {
     return (
       <div style={styles.container}>
         <div style={{ textAlign: 'center', padding: '4rem' }}>
-          <div style={{ fontSize: '1.5rem', color: '#1e40af' }}>Loading transformation dashboard...</div>
+          <div style={{ fontSize: '1.5rem', color: '#00338D' }}>Loading transformation dashboard...</div>
         </div>
       </div>
     );
@@ -539,7 +539,7 @@ const TransformationDashboardPage = () => {
           onMouseEnter={() => setIsPopupHovered(true)}
           onMouseLeave={() => { setIsPopupHovered(false); setHoveredActivity(null); }}
         >
-          <h3 style={{ fontSize: '1.2rem', fontWeight: '700', marginBottom: '1rem', color: '#1e40af', borderBottom: '2px solid #3b82f6', paddingBottom: '0.5rem' }}>
+          <h3 style={{ fontSize: '1.2rem', fontWeight: '700', marginBottom: '1rem', color: '#00338D', borderBottom: '2px solid #0091DA', paddingBottom: '0.5rem' }}>
             {Object.keys(activityDetails).find((key) => key.toLowerCase() === hoveredActivity)}
           </h3>
 
@@ -569,7 +569,7 @@ const TransformationDashboardPage = () => {
                   let status = 'Pending';
                   let statusColor = '#f59e0b';
                   if (index % 3 === 0) { status = 'Completed'; statusColor = '#16a34a'; }
-                  else if (index % 3 === 1) { status = 'Review'; statusColor = '#3b82f6'; }
+                  else if (index % 3 === 1) { status = 'Review'; statusColor = '#0091DA'; }
                   return (
                     <tr key={index} style={{ borderBottom: '1px solid #f1f5f9' }}>
                       <td style={{ padding: '0.5rem', color: '#6b7280', textAlign: 'left' }}>{item}</td>

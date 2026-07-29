@@ -6,7 +6,7 @@ import { colors, font } from '../theme';
 function useApi() {
   const { auth, logout } = useAuth();
   const token = auth?.token;
-  return useCallback(async (path, { method = 'GET', body } = {}) => {
+  const api = useCallback(async (path, { method = 'GET', body } = {}) => {
     const res = await fetch(`/api/bpm${path}`, {
       method,
       headers: {
@@ -20,6 +20,20 @@ function useApi() {
     if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
     return data;
   }, [token, logout]);
+
+  const upload = useCallback(async (path, formData) => {
+    const res = await fetch(`/api/bpm${path}`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData,
+    });
+    if (res.status === 401) { logout(); throw new Error('Session expired'); }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `Upload failed (${res.status})`);
+    return data;
+  }, [token, logout]);
+
+  return { api, upload };
 }
 
 // ─── Date helper — render ISO/date strings as DD Mon YYYY, never raw GMT strings ──
@@ -135,7 +149,7 @@ export default function Bpm() {
 
 // ─── Projects ───────────────────────────────────────────────────────────────────
 function ProjectsTab({ isManager, isSuperadmin, onError }) {
-  const api = useApi();
+  const { api, upload } = useApi();
   const [projects, setProjects] = useState([]);
   const [managers, setManagers] = useState([]);
   const [form, setForm] = useState({ name: '', owner_manager_id: '', start_date: '', end_date: '' });
@@ -255,12 +269,12 @@ function ProjectsTab({ isManager, isSuperadmin, onError }) {
 
 // ─── Tasks ──────────────────────────────────────────────────────────────────────
 function TasksTab({ isManager, role, onError }) {
-  const api = useApi();
+  const { api, upload } = useApi();
   const [tasks, setTasks] = useState([]);
   const [projects, setProjects] = useState([]);
   const [assignable, setAssignable] = useState([]);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ project_id: '', title: '', description: '', assignee_id: '', start_date: '', end_date: '' });
+  const [form, setForm] = useState({ project_id: '', title: '', description: '', assignee_id: '', start_date: '', end_date: '', recurrence_type: 'none', recurrence_days: [] });
   const isClient = ['client_sponsor', 'client_it_lead', 'client_operations'].includes(role);
   const myId = JSON.parse(localStorage.getItem('bss_auth') || '{}')?.user?.id;
 
@@ -286,8 +300,10 @@ function TasksTab({ isManager, role, onError }) {
         assignee_id: form.assignee_id ? Number(form.assignee_id) : undefined,
         start_date: form.start_date || undefined,
         end_date: form.end_date || undefined,
+        recurrence_type: form.recurrence_type || 'none',
+        recurrence_days: form.recurrence_type === 'custom' ? form.recurrence_days.join(',') : undefined,
       }});
-      setForm({ project_id: '', title: '', description: '', assignee_id: '', start_date: '', end_date: '' });
+      setForm({ project_id: '', title: '', description: '', assignee_id: '', start_date: '', end_date: '', recurrence_type: 'none', recurrence_days: [] });
       setShowForm(false);
       load();
     } catch (e) { onError(e.message); }
@@ -360,6 +376,47 @@ function TasksTab({ isManager, role, onError }) {
                 onChange={e => setForm({ ...form, end_date: e.target.value })} />
             </div>
           </div>
+          <div>
+            <span style={label}>Recurrence</span>
+            <select style={inp} value={form.recurrence_type}
+              onChange={e => setForm({ ...form, recurrence_type: e.target.value, recurrence_days: [] })}>
+              <option value="none">None (one-time)</option>
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="custom">Custom days</option>
+            </select>
+          </div>
+          {form.recurrence_type === 'custom' && (
+            <div>
+              <span style={label}>Select days</span>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => {
+                  const active = form.recurrence_days.includes(day.toLowerCase());
+                  return (
+                    <button key={day} type="button"
+                      onClick={() => {
+                        const d = day.toLowerCase();
+                        setForm(f => ({
+                          ...f,
+                          recurrence_days: active
+                            ? f.recurrence_days.filter(x => x !== d)
+                            : [...f.recurrence_days, d],
+                        }));
+                      }}
+                      style={{
+                        padding: '6px 14px', borderRadius: 20, fontSize: 13, fontWeight: 600,
+                        cursor: 'pointer', fontFamily: FONT,
+                        border: `2px solid ${active ? colors.kpmgBlue : C.border}`,
+                        background: active ? colors.kpmgBlue : C.surface,
+                        color: active ? '#fff' : C.text,
+                      }}>
+                      {day}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           <div style={{ display: 'flex', gap: 10 }}>
             <button type="submit" style={btn(C.success)}>Create task</button>
             <button type="button" style={btn(C.neutral)} onClick={() => setShowForm(false)}>Cancel</button>
@@ -376,7 +433,18 @@ function TasksTab({ isManager, role, onError }) {
             <div key={t.id} style={card}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
                 <div style={{ flex: 1, minWidth: 240 }}>
-                  <span style={badge}>{t.code}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <span style={badge}>{t.code}</span>
+                    {t.recurrence_type && t.recurrence_type !== 'none' && (
+                      <span style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 4,
+                        padding: '3px 10px', borderRadius: 12, fontSize: 11, fontWeight: 700,
+                        background: `${colors.amber}1A`, color: colors.amber,
+                      }}>
+                        &#x1f503; {t.recurrence_type === 'daily' ? 'Daily' : t.recurrence_type === 'weekly' ? 'Weekly' : t.recurrence_days?.replace(/,/g, ', ')}
+                      </span>
+                    )}
+                  </div>
                   <h3 style={{ margin: '8px 0 4px', fontSize: 16, color: C.primary }}>{t.title}</h3>
                   {t.description && <p style={{ color: C.muted, margin: '4px 0', fontSize: 13 }}>{t.description}</p>}
                   <div style={{ color: C.muted, fontSize: 13 }}>
@@ -397,6 +465,7 @@ function TasksTab({ isManager, role, onError }) {
                 </div>
               </div>
               <TaskComments taskId={t.id} canComment={!isClient && (isManager || isMine)} onError={onError} />
+              <TaskAttachments taskId={t.id} canUpload={!isClient && (isManager || isMine)} onError={onError} />
             </div>
           );
         })}
@@ -406,7 +475,7 @@ function TasksTab({ isManager, role, onError }) {
 }
 
 function TaskComments({ taskId, canComment, onError }) {
-  const api = useApi();
+  const { api, upload } = useApi();
   const [open, setOpen] = useState(false);
   const [comments, setComments] = useState([]);
   const [body, setBody] = useState('');
@@ -450,9 +519,87 @@ function TaskComments({ taskId, canComment, onError }) {
   );
 }
 
+function TaskAttachments({ taskId, canUpload, onError }) {
+  const { api, upload } = useApi();
+  const [open, setOpen] = useState(false);
+  const [files, setFiles] = useState([]);
+  const [uploading, setUploading] = useState(false);
+
+  const load = useCallback(async () => {
+    try { setFiles(await api(`/tasks/${taskId}/attachments`)); }
+    catch (e) { onError(e.message); }
+  }, [api, taskId, onError]);
+
+  useEffect(() => { if (open) load(); }, [open, load]);
+
+  const handleUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      await upload(`/tasks/${taskId}/attachments`, fd);
+      load();
+    } catch (err) { onError(err.message); }
+    finally { setUploading(false); e.target.value = ''; }
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('Delete this attachment?')) return;
+    try { await api(`/attachments/${id}`, { method: 'DELETE' }); load(); }
+    catch (err) { onError(err.message); }
+  };
+
+  return (
+    <div style={{ marginTop: 8, borderTop: `1px solid ${C.border}`, paddingTop: 10 }}>
+      <button onClick={() => setOpen(o => !o)} style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 13, fontWeight: 600, padding: 0 }}>
+        {open ? 'Hide attachments' : `Attachments${files.length ? ` (${files.length})` : ''}`}
+      </button>
+      {open && (
+        <div style={{ marginTop: 10 }}>
+          {files.length === 0 && <p style={{ color: C.muted, fontSize: 13 }}>No attachments yet.</p>}
+          {files.map(f => (
+            <div key={f.id} style={{
+              display: 'flex', alignItems: 'center', gap: 10, fontSize: 13,
+              marginBottom: 6, background: C.pill, padding: '6px 10px', borderRadius: 6,
+            }}>
+              <span style={{ flex: 1 }}>
+                <a href={`/api/bpm/attachments/${f.id}/download`}
+                  style={{ color: C.primary, fontWeight: 600, textDecoration: 'none' }}
+                  target="_blank" rel="noopener noreferrer">
+                  {f.file_name}
+                </a>
+                <span style={{ color: C.muted, marginLeft: 8 }}>by {f.uploader_name} · {fmtDate(f.created_at)}</span>
+              </span>
+              {canUpload && (
+                <button onClick={() => handleDelete(f.id)}
+                  style={{ ...btn(C.danger), padding: '3px 10px', fontSize: 11 }}>
+                  Delete
+                </button>
+              )}
+            </div>
+          ))}
+          {canUpload && (
+            <div style={{ marginTop: 8 }}>
+              <label style={{
+                ...btn(), display: 'inline-block', cursor: uploading ? 'not-allowed' : 'pointer',
+                opacity: uploading ? 0.6 : 1,
+              }}>
+                {uploading ? 'Uploading…' : 'Upload file'}
+                <input type="file" style={{ display: 'none' }} onChange={handleUpload} disabled={uploading} />
+              </label>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Users (superadmin only) ────────────────────────────────────────────────────
 function UsersTab({ onError }) {
-  const api = useApi();
+  const { api, upload } = useApi();
   const [users, setUsers] = useState([]);
   const [managers, setManagers] = useState([]);
   const [showForm, setShowForm] = useState(false);

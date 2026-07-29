@@ -66,7 +66,7 @@ export default function UATDashboardPage() {
         {/* Total Test Cases */}
         <div style={{ background: '#FFFFFF', borderRadius: 10, padding: 20, border: '1px solid #E0E8F0' }}>
           <div style={{ fontSize: 11, color: '#6B7280', fontWeight: 600, marginBottom: 4 }}>Total Test Cases</div>
-          <div style={{ fontSize: 36, fontWeight: 800, color: '#0066CC' }}>{total}</div>
+          <div style={{ fontSize: 36, fontWeight: 800, color: '#0091DA' }}>{total}</div>
           <div style={{ fontSize: 10, color: '#9CA3AF' }}>Test cases in system</div>
         </div>
 
@@ -97,13 +97,13 @@ export default function UATDashboardPage() {
           {/* Status bar */}
           <div style={{ display: 'flex', borderRadius: 6, overflow: 'hidden', height: 10, background: '#E5E7EB' }}>
             {closedPct > 0 && <div style={{ width: `${closedPct}%`, background: '#16A34A' }} />}
-            {openPct > 0 && <div style={{ width: `${openPct}%`, background: '#0066CC' }} />}
+            {openPct > 0 && <div style={{ width: `${openPct}%`, background: '#0091DA' }} />}
             {defectPct > 0 && <div style={{ width: `${defectPct}%`, background: '#DC2626' }} />}
           </div>
           {/* Completion badge */}
           <div style={{ marginTop: 10, textAlign: 'center', background: '#E0F2FE', borderRadius: 6, padding: '6px 10px' }}>
             <div style={{ fontSize: 10, color: '#6B7280' }}>Completion:</div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: '#0066CC' }}>{completionPct}% ({closed}/{total})</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#0091DA' }}>{completionPct}% ({closed}/{total})</div>
           </div>
         </div>
 

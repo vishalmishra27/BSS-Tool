@@ -163,7 +163,22 @@ def run_test_cases(test_run_id: int, headless: bool = False):
 
     try:
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=headless)
+            # Try Playwright bundled browser first; fall back to system Chrome
+            try:
+                browser = p.chromium.launch(headless=headless)
+            except Exception:
+                logger.info("Bundled Chromium not found, trying system Chrome")
+                chrome_paths = [
+                    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+                    "/usr/bin/google-chrome",
+                    "/usr/bin/chromium-browser",
+                ]
+                chrome_path = next((p_path for p_path in chrome_paths if os.path.exists(p_path)), None)
+                if not chrome_path:
+                    raise RuntimeError(
+                        "No browser found. Install Playwright browsers: python3 -m playwright install chromium"
+                    )
+                browser = p.chromium.launch(headless=headless, executable_path=chrome_path)
             context = browser.new_context()
             page    = context.new_page()
             # Auto-dismiss unexpected alert / confirm / prompt dialogs so they

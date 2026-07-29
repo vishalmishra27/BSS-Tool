@@ -1,0 +1,777 @@
+################################################################################
+# FILE: requirements.txt
+################################################################################
+streamlit>=1.30.0
+openai>=1.10.0
+python-dotenv>=1.0.0
+azure-ai-documentintelligence>=1.0.0
+azure-core>=1.30.0
+pandas>=2.0.0
+
+################################################################################
+# FILE: app.py
+################################################################################
+"""
+French Audit Document Translator
+=================================
+Azure Document Intelligence OCR + Professional French-to-English translation
+for scanned financial and audit documents.
+
+Run:
+    pip install -r requirements.txt
+    streamlit run app.py
+
+Environment variables (.env file):
+    AZURE_OPENAI_KEY              — for GPT translation
+    AZURE_OPENAI_ENDPOINT
+    AZURE_OPENAI_DEPLOYMENT       — default: gpt-4o-mini
+    AZURE_DOC_INTELLIGENCE_KEY    — for scanned PDF OCR
+    AZURE_DOC_INTELLIGENCE_ENDPOINT
+"""
+
+import os
+import re
+import json
+import time
+import logging
+from pathlib import Path
+
+import streamlit as st
+from dotenv import load_dotenv
+
+# Load .env from this folder
+_app_dir = Path(__file__).resolve().parent
+load_dotenv(_app_dir / ".env")
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Page config
+# ---------------------------------------------------------------------------
+st.set_page_config(
+    page_title="French Audit Document Translator",
+    page_icon="🇫🇷",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+
+# ---------------------------------------------------------------------------
+# KPMG brand colours
+# ---------------------------------------------------------------------------
+KPMG_BLUE = "#00338D"
+KPMG_BLUE_LIGHT = "#0091DA"
+KPMG_NAVY = "#001F5B"
+KPMG_PURPLE = "#483698"
+
+# ---------------------------------------------------------------------------
+# Translation system prompt
+# ---------------------------------------------------------------------------
+TRANSLATION_SYSTEM_PROMPT = """You are a professional French-to-English translator specializing in financial and audit documents.
+
+Translate the following text, extracted via OCR from a French audit/business document, into clear, professional English.
+
+Instructions:
+- Preserve the original structure: headings, numbered lists, paragraphs.
+- Keep technical/financial terms accurate (e.g., "mission de procedures convenues" -> "agreed-upon procedures engagement").
+- Keep proper nouns, company names, and standard references (ISRS 4400, OHADA, IFAC/ISA) unchanged.
+- If OCR artifacts, watermark text, or stray characters appear (e.g. diagonal stamps, garbled fragments), ignore them and do not include them in the translation.
+- Do not summarize -- translate faithfully and completely.
+- Output only the translated text, no commentary."""
+
+# ---------------------------------------------------------------------------
+# Custom CSS
+# ---------------------------------------------------------------------------
+st.markdown(f"""
+<style>
+    .main-header {{
+        background: linear-gradient(135deg, {KPMG_BLUE} 0%, {KPMG_BLUE_LIGHT} 100%);
+        padding: 24px 32px;
+        border-radius: 12px;
+        margin-bottom: 24px;
+        color: white;
+    }}
+    .main-header h1 {{ margin: 0; font-size: 28px; font-weight: 700; }}
+    .main-header p {{ margin: 4px 0 0; opacity: 0.85; font-size: 14px; }}
+    .stat-card {{
+        background: white;
+        border: 1px solid #E0E8F0;
+        border-radius: 10px;
+        padding: 16px 20px;
+        text-align: center;
+    }}
+    .stat-card .label {{ font-size: 12px; color: #6B7280; font-weight: 600; text-transform: uppercase; }}
+    .stat-card .value {{ font-size: 26px; font-weight: 700; color: {KPMG_NAVY}; }}
+    .status-badge {{
+        display: inline-block;
+        padding: 3px 10px;
+        border-radius: 12px;
+        font-size: 11px;
+        font-weight: 600;
+    }}
+    .status-ocr {{ background: #FEF3C7; color: #92400E; }}
+    .status-translated {{ background: #DCFCE7; color: #166534; }}
+    [data-testid="stSidebar"] {{
+        background: linear-gradient(180deg, #0a1628 0%, #0f2847 60%, #132e4a 100%);
+    }}
+    [data-testid="stSidebar"] * {{ color: white !important; }}
+    [data-testid="stSidebar"] .stFileUploader label {{
+        color: rgba(255,255,255,0.8) !important;
+    }}
+</style>
+""", unsafe_allow_html=True)
+
+# ---------------------------------------------------------------------------
+# Azure OpenAI client (for translation)
+# ---------------------------------------------------------------------------
+_llm_client = None
+
+def _get_llm_client():
+    global _llm_client
+    if _llm_client is not None:
+        return _llm_client
+    key = os.getenv("AZURE_OPENAI_KEY")
+    endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
+    if not key or not endpoint:
+        return None
+    from openai import AzureOpenAI
+    _llm_client = AzureOpenAI(
+        api_key=key,
+        azure_endpoint=endpoint,
+        api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2023-07-01-preview"),
+    )
+    return _llm_client
+
+
+def _translate_chunk(text: str) -> str:
+    """Translate a single chunk of French text to English using Azure OpenAI."""
+    client = _get_llm_client()
+    if client is None:
+        raise RuntimeError(
+            "Azure OpenAI not configured. Set AZURE_OPENAI_KEY and "
+            "AZURE_OPENAI_ENDPOINT in your .env file."
+        )
+    model = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o-mini")
+    resp = client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": TRANSLATION_SYSTEM_PROMPT},
+            {"role": "user", "content": text},
+        ],
+        max_tokens=4096,
+        temperature=0.1,
+    )
+    return resp.choices[0].message.content.strip()
+
+
+def translate_document(text: str, progress_callback=None) -> str:
+    """
+    Translate full document text from French to English.
+    Splits into manageable chunks to stay within token limits.
+    """
+    max_chars = 8000  # safe for gpt-4o-mini context
+    if len(text) <= max_chars:
+        if progress_callback:
+            progress_callback(0, 1)
+        result = _translate_chunk(text)
+        if progress_callback:
+            progress_callback(1, 1)
+        return result
+
+    # Split by page markers first, then by paragraphs
+    pages = re.split(r'(--- Page \d+ ---)', text)
+    chunks = []
+    current = ""
+
+    for part in pages:
+        if len(current) + len(part) + 2 > max_chars and current:
+            chunks.append(current)
+            current = part
+        else:
+            current += ("\n\n" if current else "") + part
+    if current:
+        chunks.append(current)
+
+    translated_parts = []
+    for i, chunk in enumerate(chunks):
+        if progress_callback:
+            progress_callback(i, len(chunks))
+        translated_parts.append(_translate_chunk(chunk))
+    if progress_callback:
+        progress_callback(len(chunks), len(chunks))
+
+    return "\n\n".join(translated_parts)
+
+
+# ---------------------------------------------------------------------------
+# Azure Document Intelligence OCR
+# ---------------------------------------------------------------------------
+
+_di_client = None
+_di_available = False
+
+def _init_doc_intelligence():
+    """Initialize Azure Document Intelligence client."""
+    global _di_client, _di_available
+    if _di_client is not None:
+        return _di_available
+
+    try:
+        from azure.ai.documentintelligence import DocumentIntelligenceClient
+        from azure.core.credentials import AzureKeyCredential
+
+        key = (os.getenv("AZURE_DOC_INTELLIGENCE_KEY", "")
+               or os.getenv("AZURE_DOCUMENT_INTELLIGENCE_KEY", ""))
+        endpoint = (os.getenv("AZURE_DOC_INTELLIGENCE_ENDPOINT", "")
+                    or os.getenv("AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT", ""))
+
+        if key and endpoint:
+            _di_client = DocumentIntelligenceClient(
+                endpoint=endpoint,
+                credential=AzureKeyCredential(key),
+            )
+            _di_available = True
+            logger.info("Azure Document Intelligence initialized")
+        else:
+            logger.warning("Azure DI credentials not set")
+            _di_available = False
+    except ImportError:
+        logger.warning("azure-ai-documentintelligence not installed")
+        _di_available = False
+    except Exception as e:
+        logger.warning(f"Azure DI init failed: {e}")
+        _di_available = False
+
+    return _di_available
+
+
+def extract_scanned_pdf_azure(file_bytes: bytes) -> tuple[str, int, list]:
+    """
+    Extract text and tables from a scanned PDF using Azure Document Intelligence.
+    Returns (extracted_text, page_count, tables).
+    Each table is a dict: {page, row_count, col_count, headers, rows, raw_markdown}.
+    """
+    from azure.ai.documentintelligence.models import AnalyzeDocumentRequest
+
+    _init_doc_intelligence()
+    if not _di_available or _di_client is None:
+        raise RuntimeError(
+            "Azure Document Intelligence not configured. "
+            "Set AZURE_DOC_INTELLIGENCE_KEY and AZURE_DOC_INTELLIGENCE_ENDPOINT in .env"
+        )
+
+    # Call Azure DI with retry
+    max_retries = 3
+    last_error = None
+    for attempt in range(max_retries):
+        try:
+            poller = _di_client.begin_analyze_document(
+                "prebuilt-layout",
+                AnalyzeDocumentRequest(bytes_source=file_bytes),
+            )
+            result = poller.result()
+            break
+        except Exception as e:
+            last_error = e
+            if attempt < max_retries - 1:
+                delay = 2 * (2 ** attempt)
+                logger.warning(f"DI attempt {attempt+1}/{max_retries} failed: {e}. Retrying in {delay}s...")
+                time.sleep(delay)
+    else:
+        raise RuntimeError(f"Azure Document Intelligence failed after {max_retries} attempts: {last_error}")
+
+    # Extract text page by page
+    full_text = ""
+    page_count = len(result.pages) if result.pages else 0
+
+    if result.pages:
+        for page in result.pages:
+            page_num = page.page_number
+            page_lines = []
+            if page.lines:
+                for line in page.lines:
+                    page_lines.append(line.content)
+            if page_lines:
+                full_text += f"--- Page {page_num} ---\n" + "\n".join(page_lines) + "\n\n"
+    elif result.content:
+        full_text = result.content
+        page_count = 1
+
+    # Extract tables
+    tables = []
+    if result.tables:
+        for t_idx, table in enumerate(result.tables):
+            row_count = table.row_count
+            col_count = table.column_count
+
+            # Determine which page this table is on
+            table_page = None
+            if table.bounding_regions:
+                table_page = table.bounding_regions[0].page_number
+
+            # Build a 2D grid from cells
+            grid = [["" for _ in range(col_count)] for _ in range(row_count)]
+            for cell in table.cells:
+                r, c = cell.row_index, cell.column_index
+                if r < row_count and c < col_count:
+                    grid[r][c] = (cell.content or "").strip()
+
+            # First row as headers, rest as data rows
+            headers = grid[0] if grid else []
+            rows = grid[1:] if len(grid) > 1 else []
+
+            # Build markdown representation
+            md_lines = []
+            if headers:
+                md_lines.append("| " + " | ".join(headers) + " |")
+                md_lines.append("| " + " | ".join(["---"] * len(headers)) + " |")
+            for row in rows:
+                md_lines.append("| " + " | ".join(row) + " |")
+            raw_markdown = "\n".join(md_lines)
+
+            tables.append({
+                "index": t_idx + 1,
+                "page": table_page,
+                "row_count": row_count,
+                "col_count": col_count,
+                "headers": headers,
+                "rows": rows,
+                "markdown": raw_markdown,
+            })
+
+    return full_text.strip(), page_count, tables
+
+
+def _clean_ocr_text(text: str) -> str:
+    """Clean OCR artifacts from extracted text."""
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    text = re.sub(r'[ \t]+', ' ', text)
+    text = re.sub(r'(\w)-\n(\w)', r'\1\2', text)  # fix hyphenation
+    text = re.sub(r'[|]{2,}', '', text)
+    text = re.sub(r'_{3,}', '', text)
+    return text.strip()
+
+
+# ---------------------------------------------------------------------------
+# Session state
+# ---------------------------------------------------------------------------
+
+if "documents" not in st.session_state:
+    st.session_state.documents = {}  # name -> {french_text, english_text, pages, tables, status}
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []  # list of {role, content}
+
+# ---------------------------------------------------------------------------
+# Sidebar
+# ---------------------------------------------------------------------------
+
+with st.sidebar:
+    st.markdown(f"""
+    <div style="text-align:center; padding: 16px 0 8px;">
+        <div style="display:inline-flex;align-items:center;justify-content:center;
+                    width:44px;height:44px;background:linear-gradient(135deg,{KPMG_BLUE},{KPMG_BLUE_LIGHT});
+                    border-radius:10px;font-size:22px;margin-bottom:8px;">🇫🇷</div>
+        <div style="font-size:16px;font-weight:700;">Audit Translator</div>
+        <div style="font-size:11px;opacity:0.6;">French → English</div>
+        <div style="font-size:10px;opacity:0.4;margin-top:2px;">KPMG Advisory</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.divider()
+
+    # Check Azure DI availability
+    di_ready = _init_doc_intelligence()
+    if not di_ready:
+        st.warning("Azure Document Intelligence not configured. Set AZURE_DOC_INTELLIGENCE_KEY and AZURE_DOC_INTELLIGENCE_ENDPOINT in .env")
+
+    st.subheader("Upload Scanned PDFs")
+    uploaded_files = st.file_uploader(
+        "French audit/financial documents (scanned PDF)",
+        type=["pdf"],
+        accept_multiple_files=True,
+        key="file_uploader",
+    )
+
+    if uploaded_files:
+        for uf in uploaded_files:
+            if uf.name not in st.session_state.documents:
+                with st.spinner(f"OCR processing {uf.name} via Azure Document Intelligence..."):
+                    try:
+                        file_bytes = uf.read()
+                        uf.seek(0)
+                        raw_text, page_count, tables = extract_scanned_pdf_azure(file_bytes)
+                        if raw_text:
+                            cleaned = _clean_ocr_text(raw_text)
+                            st.session_state.documents[uf.name] = {
+                                "french_text": cleaned,
+                                "english_text": None,
+                                "pages": page_count,
+                                "chars": len(cleaned),
+                                "tables": tables,
+                                "status": "ocr_done",
+                            }
+                            table_msg = f", {len(tables)} table(s)" if tables else ""
+                            st.success(f"{uf.name}: {page_count} pages, {len(cleaned):,} chars{table_msg} extracted")
+                        else:
+                            st.error(f"No text extracted from {uf.name}.")
+                    except Exception as e:
+                        st.error(f"OCR failed for {uf.name}: {e}")
+
+    if st.session_state.documents:
+        st.divider()
+        st.subheader("Loaded Documents")
+        for name, info in st.session_state.documents.items():
+            status_class = "status-translated" if info["status"] == "translated" else "status-ocr"
+            status_label = "Translated" if info["status"] == "translated" else "OCR Complete"
+            st.markdown(f"""
+            <div style="background:rgba(255,255,255,0.08);border-radius:8px;padding:10px 12px;margin-bottom:8px;">
+                <div style="font-size:13px;font-weight:600;">{name}</div>
+                <div style="font-size:11px;opacity:0.6;">{info['pages']} pages | {info['chars']:,} chars | {len(info.get('tables', []))} tables</div>
+                <span class="status-badge {status_class}">{status_label}</span>
+            </div>
+            """, unsafe_allow_html=True)
+
+        if st.button("Clear All", use_container_width=True):
+            st.session_state.documents = {}
+            st.session_state.chat_history = []
+            st.rerun()
+
+
+# ---------------------------------------------------------------------------
+# Main content
+# ---------------------------------------------------------------------------
+
+st.markdown(f"""
+<div class="main-header">
+    <h1>French Audit Document Translator</h1>
+    <p>Upload scanned French audit/financial PDFs — Azure Document Intelligence extracts the text, then AI translates to professional English.</p>
+</div>
+""", unsafe_allow_html=True)
+
+# Stats row
+total_docs = len(st.session_state.documents)
+total_pages = sum(d["pages"] for d in st.session_state.documents.values())
+total_translated = sum(1 for d in st.session_state.documents.values() if d["status"] == "translated")
+total_chars = sum(d["chars"] for d in st.session_state.documents.values())
+
+c1, c2, c3, c4 = st.columns(4)
+with c1:
+    st.markdown(f'<div class="stat-card"><div class="label">Documents</div><div class="value">{total_docs}</div></div>', unsafe_allow_html=True)
+with c2:
+    st.markdown(f'<div class="stat-card"><div class="label">Total Pages</div><div class="value">{total_pages}</div></div>', unsafe_allow_html=True)
+with c3:
+    st.markdown(f'<div class="stat-card"><div class="label">Translated</div><div class="value">{total_translated}/{total_docs}</div></div>', unsafe_allow_html=True)
+with c4:
+    st.markdown(f'<div class="stat-card"><div class="label">Characters</div><div class="value">{total_chars:,}</div></div>', unsafe_allow_html=True)
+
+st.markdown("<br>", unsafe_allow_html=True)
+
+if not st.session_state.documents:
+    st.info("Upload scanned French audit PDFs from the sidebar to get started.")
+    st.stop()
+
+# ---------------------------------------------------------------------------
+# Tabs
+# ---------------------------------------------------------------------------
+tab_translate, tab_tables, tab_chat, tab_french, tab_english, tab_sidebyside = st.tabs([
+    "Translate", "Tables", "Chat", "French (OCR)", "English (Translated)", "Side-by-Side"
+])
+
+# ---------------------------------------------------------------------------
+# Tab 1: Translate
+# ---------------------------------------------------------------------------
+with tab_translate:
+    st.subheader("Translate Documents")
+
+    untranslated = [n for n, d in st.session_state.documents.items() if d["status"] != "translated"]
+
+    if untranslated:
+        if st.button(f"Translate All ({len(untranslated)} remaining)", type="primary", use_container_width=True):
+            for doc_name in untranslated:
+                doc = st.session_state.documents[doc_name]
+                st.markdown(f"**Translating:** {doc_name} ({doc['pages']} pages)...")
+                progress_bar = st.progress(0, text=f"Translating {doc_name}...")
+
+                def update_progress(current, total):
+                    progress_bar.progress(
+                        current / total if total > 0 else 1.0,
+                        text=f"Translating {doc_name}: chunk {current}/{total}"
+                    )
+
+                try:
+                    english = translate_document(doc["french_text"], progress_callback=update_progress)
+                    doc["english_text"] = english
+                    doc["status"] = "translated"
+                    st.success(f"{doc_name} translated successfully!")
+                except Exception as e:
+                    st.error(f"Translation failed for {doc_name}: {e}")
+
+            st.rerun()
+    else:
+        st.success("All documents have been translated!")
+
+    st.divider()
+
+    for doc_name, doc in st.session_state.documents.items():
+        col_info, col_action = st.columns([3, 1])
+        with col_info:
+            status_emoji = "✅" if doc["status"] == "translated" else "📄"
+            st.markdown(f"{status_emoji} **{doc_name}** — {doc['pages']} pages, {doc['chars']:,} chars")
+        with col_action:
+            if doc["status"] != "translated":
+                if st.button("Translate", key=f"tr_{doc_name}"):
+                    progress_bar = st.progress(0, text=f"Translating {doc_name}...")
+
+                    def update_progress(current, total):
+                        progress_bar.progress(
+                            current / total if total > 0 else 1.0,
+                            text=f"Chunk {current}/{total}"
+                        )
+
+                    try:
+                        english = translate_document(doc["french_text"], progress_callback=update_progress)
+                        doc["english_text"] = english
+                        doc["status"] = "translated"
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Failed: {e}")
+            else:
+                st.markdown("✅ Done")
+
+# ---------------------------------------------------------------------------
+# Tab 2: Tables
+# ---------------------------------------------------------------------------
+with tab_tables:
+    st.subheader("Extracted Tables")
+    all_tables = []
+    for doc_name, doc in st.session_state.documents.items():
+        for tbl in doc.get("tables", []):
+            all_tables.append((doc_name, tbl))
+
+    if not all_tables:
+        st.info("No tables found in the uploaded documents.")
+    else:
+        st.markdown(f"**{len(all_tables)} table(s)** found across all documents.")
+        st.divider()
+
+        for doc_name, tbl in all_tables:
+            page_label = f"Page {tbl['page']}" if tbl['page'] else "Unknown page"
+            with st.expander(
+                f"Table {tbl['index']} — {doc_name} — {page_label} "
+                f"({tbl['row_count']} rows x {tbl['col_count']} cols)",
+                expanded=True,
+            ):
+                # Display as interactive dataframe
+                import pandas as pd
+                if tbl["headers"] and tbl["rows"]:
+                    df = pd.DataFrame(tbl["rows"], columns=tbl["headers"])
+                    st.dataframe(df, use_container_width=True)
+
+                    # Download as CSV
+                    csv_data = df.to_csv(index=False)
+                    st.download_button(
+                        "Download CSV",
+                        data=csv_data,
+                        file_name=f"{Path(doc_name).stem}_table{tbl['index']}.csv",
+                        mime="text/csv",
+                        key=f"csv_{doc_name}_{tbl['index']}",
+                    )
+
+                    # Translate table button
+                    if st.button(f"Translate to English", key=f"tr_tbl_{doc_name}_{tbl['index']}"):
+                        with st.spinner("Translating table..."):
+                            try:
+                                translated_md = _translate_chunk(
+                                    f"Translate this table from French to English. "
+                                    f"Return it as a markdown table:\n\n{tbl['markdown']}"
+                                )
+                                st.markdown("**English Translation:**")
+                                st.markdown(translated_md)
+                            except Exception as e:
+                                st.error(f"Translation failed: {e}")
+                elif tbl["markdown"]:
+                    st.markdown(tbl["markdown"])
+
+# ---------------------------------------------------------------------------
+# Tab 3: Chat with Documents
+# ---------------------------------------------------------------------------
+with tab_chat:
+    st.subheader("Chat with Your Documents")
+    st.caption("Ask questions about the document content, tables, figures, or request specific extractions.")
+
+    # Build full context: text + tables
+    def _build_doc_context() -> str:
+        parts = []
+        for doc_name, doc in st.session_state.documents.items():
+            parts.append(f"=== Document: {doc_name} ({doc['pages']} pages) ===")
+            # Include the full OCR text (truncated for context)
+            text = doc["french_text"][:60_000]
+            parts.append(text)
+            # Include tables as markdown
+            for tbl in doc.get("tables", []):
+                page_label = f"Page {tbl['page']}" if tbl['page'] else ""
+                parts.append(f"\n[Table {tbl['index']} — {page_label}]")
+                parts.append(tbl["markdown"])
+        return "\n\n".join(parts)
+
+    # Display chat history
+    for msg in st.session_state.chat_history:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
+
+    # Chat input
+    user_prompt = st.chat_input("Ask about your documents (e.g., 'What tables are on page 3?', 'Summarize the findings')")
+
+    if user_prompt:
+        st.session_state.chat_history.append({"role": "user", "content": user_prompt})
+        with st.chat_message("user"):
+            st.markdown(user_prompt)
+
+        with st.chat_message("assistant"):
+            with st.spinner("Analysing documents..."):
+                try:
+                    doc_context = _build_doc_context()
+                    # Truncate context to fit within limits
+                    if len(doc_context) > 100_000:
+                        doc_context = doc_context[:100_000] + "\n\n[content truncated]"
+
+                    system_msg = """You are an expert document analyst specializing in French financial and audit documents.
+You have access to OCR-extracted text and tables from scanned French audit documents.
+
+When answering:
+- If the user asks about tables, refer to the extracted tables provided.
+- If the user asks for translation, translate French text to professional English.
+- If the user asks about specific pages, focus on content from those pages.
+- For financial terms, use accurate English equivalents.
+- Be precise, cite page numbers and table numbers when relevant.
+- If asked to extract or format data, present it clearly (use markdown tables when appropriate).
+- You can answer in English or French depending on the user's question language."""
+
+                    client = _get_llm_client()
+                    if client is None:
+                        st.error("Azure OpenAI not configured.")
+                    else:
+                        model = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o-mini")
+
+                        # Build messages with conversation history (last 10 turns)
+                        messages = [{"role": "system", "content": system_msg}]
+                        messages.append({
+                            "role": "system",
+                            "content": f"DOCUMENT CONTENT:\n{doc_context}"
+                        })
+                        # Include recent chat history for context
+                        recent = st.session_state.chat_history[-10:]
+                        for msg in recent:
+                            messages.append({"role": msg["role"], "content": msg["content"]})
+
+                        resp = client.chat.completions.create(
+                            model=model,
+                            messages=messages,
+                            max_tokens=4096,
+                            temperature=0.2,
+                        )
+                        answer = resp.choices[0].message.content.strip()
+                        st.markdown(answer)
+                        st.session_state.chat_history.append({"role": "assistant", "content": answer})
+                except Exception as e:
+                    st.error(f"Error: {e}")
+
+# ---------------------------------------------------------------------------
+# Tab 4: French (OCR text)
+# ---------------------------------------------------------------------------
+with tab_french:
+    st.subheader("Extracted French Text (Azure Document Intelligence)")
+    for doc_name, doc in st.session_state.documents.items():
+        with st.expander(f"{doc_name} — {doc['pages']} pages, {doc['chars']:,} chars", expanded=len(st.session_state.documents) == 1):
+            st.text_area(
+                "French (OCR)",
+                doc["french_text"][:80_000],
+                height=500,
+                key=f"fr_{doc_name}",
+                disabled=True,
+            )
+            st.download_button(
+                "Download French text (.txt)",
+                data=doc["french_text"],
+                file_name=f"{Path(doc_name).stem}_french_ocr.txt",
+                mime="text/plain",
+                key=f"dl_fr_{doc_name}",
+            )
+
+# ---------------------------------------------------------------------------
+# Tab 5: English (translated)
+# ---------------------------------------------------------------------------
+with tab_english:
+    st.subheader("Translated English Text")
+    translated_docs = {n: d for n, d in st.session_state.documents.items() if d["status"] == "translated"}
+
+    if not translated_docs:
+        st.info("No documents translated yet. Go to the Translate tab to start.")
+    else:
+        for doc_name, doc in translated_docs.items():
+            with st.expander(f"{doc_name}", expanded=len(translated_docs) == 1):
+                st.text_area(
+                    "English Translation",
+                    doc["english_text"][:80_000],
+                    height=500,
+                    key=f"en_{doc_name}",
+                    disabled=True,
+                )
+                st.download_button(
+                    "Download English translation (.txt)",
+                    data=doc["english_text"],
+                    file_name=f"{Path(doc_name).stem}_english.txt",
+                    mime="text/plain",
+                    key=f"dl_en_{doc_name}",
+                )
+
+# ---------------------------------------------------------------------------
+# Tab 6: Side-by-Side
+# ---------------------------------------------------------------------------
+with tab_sidebyside:
+    st.subheader("Side-by-Side Comparison")
+    translated_docs = {n: d for n, d in st.session_state.documents.items() if d["status"] == "translated"}
+
+    if not translated_docs:
+        st.info("Translate a document first to see the side-by-side view.")
+    else:
+        selected_doc = st.selectbox("Select document", list(translated_docs.keys()))
+        doc = translated_docs[selected_doc]
+
+        col_fr, col_en = st.columns(2)
+        with col_fr:
+            st.markdown(f"**🇫🇷 French (OCR)**")
+            st.text_area(
+                "French",
+                doc["french_text"][:80_000],
+                height=600,
+                key=f"sbs_fr_{selected_doc}",
+                disabled=True,
+                label_visibility="collapsed",
+            )
+        with col_en:
+            st.markdown(f"**🇬🇧 English (Translated)**")
+            st.text_area(
+                "English",
+                doc["english_text"][:80_000],
+                height=600,
+                key=f"sbs_en_{selected_doc}",
+                disabled=True,
+                label_visibility="collapsed",
+            )
+
+################################################################################
+# FILE: .env
+################################################################################
+# ══════════════════════════════════════════════════════════════════
+# French Audit Document Translator — Environment Configuration
+# ══════════════════════════════════════════════════════════════════
+
+# ── Azure OpenAI (for GPT translation) ──────────────────────────
+AZURE_OPENAI_KEY=808cf0ccab8445b39c6d8767a7e2c433
+AZURE_OPENAI_ENDPOINT=https://entgptaiuat.openai.azure.com
+AZURE_OPENAI_DEPLOYMENT=gpt-4o-mini
+AZURE_OPENAI_API_VERSION=2023-07-01-preview
+
+# ── Azure Document Intelligence (for scanned PDF OCR) ───────────
+AZURE_DOC_INTELLIGENCE_KEY=
+AZURE_DOC_INTELLIGENCE_ENDPOINT=

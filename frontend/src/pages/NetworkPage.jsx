@@ -145,22 +145,22 @@ const NetworkPage = () => {
         {/* Summary stat cards (shown after processing) */}
         {results && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <div className="bg-gradient-to-br from-[#004fd9] to-[#00338d] p-6 rounded-lg text-white shadow-lg">
+            <div className="bg-gradient-to-br from-[#00338D] to-[#00338d] p-6 rounded-lg text-white shadow-lg">
               <p className="text-sm uppercase opacity-80">Files Processed</p>
               <p className="text-3xl font-bold">{results.length}</p>
               <p className="text-xs mt-1 text-green-300">+{results.length} completed</p>
             </div>
-            <div className="bg-gradient-to-br from-[#004fd9] to-[#00338d] p-6 rounded-lg text-white shadow-lg">
+            <div className="bg-gradient-to-br from-[#00338D] to-[#00338d] p-6 rounded-lg text-white shadow-lg">
               <p className="text-sm uppercase opacity-80">Total Records</p>
               <p className="text-3xl font-bold">{totalRecords.toLocaleString()}</p>
               <p className="text-xs mt-1 text-green-300">Extracted successfully</p>
             </div>
-            <div className="bg-gradient-to-br from-[#004fd9] to-[#00338d] p-6 rounded-lg text-white shadow-lg">
+            <div className="bg-gradient-to-br from-[#00338D] to-[#00338d] p-6 rounded-lg text-white shadow-lg">
               <p className="text-sm uppercase opacity-80">Tags Identified</p>
               <p className="text-3xl font-bold">{totalTags}</p>
               <p className="text-xs mt-1 text-green-300">Unique configuration tags</p>
             </div>
-            <div className="bg-gradient-to-br from-[#004fd9] to-[#00338d] p-6 rounded-lg text-white shadow-lg">
+            <div className="bg-gradient-to-br from-[#00338D] to-[#00338d] p-6 rounded-lg text-white shadow-lg">
               <div className="flex items-center space-x-2">
                 <CheckCircle size={20} className="text-green-300" />
                 <p className="text-sm uppercase opacity-80">Status</p>

@@ -32,7 +32,7 @@ function StatusBadge({ status }) {
 }
 
 // ── Slim progress bar ─────────────────────────────────────────────────────────
-function ProgressBar({ value, max, color = '#0066CC' }) {
+function ProgressBar({ value, max, color = '#0091DA' }) {
   const pct = max > 0 ? Math.min(Math.round((value / max) * 100), 100) : 0;
   return (
     <div style={{ background: '#E5E7EB', borderRadius: 4, height: 6, overflow: 'hidden', flex: 1 }}>
@@ -129,7 +129,7 @@ function ResultsTable({ results }) {
                       borderBottom: '1px solid #F0F0F0',
                     }}>
                       <td style={{ padding: '7px 12px', color: '#6B7280', whiteSpace: 'nowrap' }}>{s.step_id}</td>
-                      <td style={{ padding: '7px 12px', color: '#0066CC', fontWeight: 600, whiteSpace: 'nowrap' }}>{s.action}</td>
+                      <td style={{ padding: '7px 12px', color: '#0091DA', fontWeight: 600, whiteSpace: 'nowrap' }}>{s.action}</td>
                       <td style={{ padding: '7px 12px', color: '#222222', fontFamily: 'monospace', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={s.selector || ''}>{s.selector || '—'}</td>
                       <td style={{ padding: '7px 12px', color: '#222222', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={s.input_value || ''}>{s.input_value || '—'}</td>
                       <td style={{ padding: '7px 12px', color: '#222222', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={s.expected_result || ''}>{s.expected_result || '—'}</td>
@@ -142,7 +142,7 @@ function ResultsTable({ results }) {
                             style={{
                               background: '#EFF6FF', border: '1px solid #BFDBFE',
                               borderRadius: 4, padding: '3px 10px', cursor: 'pointer',
-                              color: '#0066CC', fontSize: 11, fontWeight: 600,
+                              color: '#0091DA', fontSize: 11, fontWeight: 600,
                             }}
                           >
                             View
@@ -336,7 +336,7 @@ export default function UATAutomationPage() {
       {/* ── Header ── */}
       <div style={{ padding: '22px 28px 18px', borderBottom: '1px solid #E0E8F0', background: '#FFFFFF' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#003087" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#00338D" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="9 11 12 14 22 4"/>
             <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
           </svg>
@@ -372,7 +372,7 @@ export default function UATAutomationPage() {
                 onClick={() => fileRef.current?.click()}
               >
                 <input ref={fileRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }} id="uat-file" />
-                <div style={{ color: '#0066CC', fontSize: 12 }}>
+                <div style={{ color: '#0091DA', fontSize: 12 }}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ verticalAlign: 'middle', marginRight: 4 }}>
                     <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
                     <polyline points="17 8 12 3 7 8"/>
@@ -393,7 +393,7 @@ export default function UATAutomationPage() {
 
               <button type="submit" disabled={uploading} style={{
                 width: '100%', padding: '8px 0',
-                background: uploading ? '#93C5FD' : '#003087',
+                background: uploading ? '#93C5FD' : '#00338D',
                 border: 'none', borderRadius: 5, color: '#fff',
                 fontWeight: 700, fontSize: 12, cursor: uploading ? 'not-allowed' : 'pointer',
               }}>
@@ -407,7 +407,7 @@ export default function UATAutomationPage() {
                 type="checkbox"
                 checked={headless}
                 onChange={e => setHeadless(e.target.checked)}
-                style={{ accentColor: '#0066CC', width: 14, height: 14, cursor: 'pointer' }}
+                style={{ accentColor: '#0091DA', width: 14, height: 14, cursor: 'pointer' }}
               />
               <span style={{ fontSize: 12, color: '#4A4A4A' }}>
                 Headless browser
@@ -490,7 +490,7 @@ export default function UATAutomationPage() {
                   <div style={{ display: 'flex', gap: 28, flexWrap: 'wrap', marginBottom: 12 }}>
                     {[
                       { label: 'Total',     val: statusData.total_steps     || 0, color: '#6B7280' },
-                      { label: 'Completed', val: statusData.completed_steps || 0, color: '#0066CC' },
+                      { label: 'Completed', val: statusData.completed_steps || 0, color: '#0091DA' },
                       { label: 'Passed',    val: statusData.passed          || 0, color: '#16a34a' },
                       { label: 'Failed',    val: statusData.failed          || 0, color: '#dc2626' },
                     ].map(({ label, val, color }) => (

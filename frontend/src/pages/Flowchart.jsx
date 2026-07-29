@@ -146,7 +146,7 @@ const Flowchart = () => {
     if (type === 'parallel') {
       return status === 'current' ? 'bg-purple-500 hover:bg-purple-600' : 'bg-purple-400 hover:bg-purple-500';
     }
-    return 'bg-[#4178d9] hover:bg-[#3059a0]';
+    return 'bg-[#0091DA] hover:bg-[#002266]';
   };
 
   const handleNodeClickForPopup = (event, node) => {
@@ -330,7 +330,7 @@ const Flowchart = () => {
           y1={fromCenter.y}
           x2={toCenter.x}
           y2={toCenter.y}
-          stroke="#4178d9"
+          stroke="#0091DA"
           strokeWidth="2"
           markerEnd="url(#arrowhead)"
         />
@@ -348,7 +348,7 @@ const Flowchart = () => {
             y1={startCenter.y}
             x2={mousePos.x}
             y2={mousePos.y}
-            stroke="#004fd9"
+            stroke="#00338D"
             strokeWidth="2"
             strokeDasharray="5,5"
           />
@@ -379,12 +379,12 @@ const Flowchart = () => {
   ];
 
   return (
-    <div className="h-screen w-full bg-gradient-to-br from-[#00215a] to-[#3059a0] overflow-hidden relative z-0">
+    <div className="h-screen w-full bg-gradient-to-br from-[#00215a] to-[#002266] overflow-hidden relative z-0">
       <div className="absolute top-4 left-4 z-20 bg-[#00215a]/50 backdrop-blur-md rounded-lg p-4 shadow-xl">
         <div className="flex flex-wrap gap-3 mb-4">
           <button
             onClick={addNode}
-            className="flex items-center gap-2 px-4 py-2 bg-[#004fd9] hover:bg-[#4178d9] text-white rounded-lg transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-[#00338D] hover:bg-[#0091DA] text-white rounded-lg transition-colors"
           >
             <Plus size={16} />
             Add Node
@@ -395,7 +395,7 @@ const Flowchart = () => {
               setConnectionStart(null);
             }}
             className={`flex items-center gap-2 px-4 py-2 ${
-              isConnecting ? 'bg-[#4178d9]' : 'bg-[#00338d] hover:bg-[#004fd9]'
+              isConnecting ? 'bg-[#0091DA]' : 'bg-[#00338d] hover:bg-[#00338D]'
             } text-white rounded-lg transition-colors`}
           >
             🔗 {isConnecting ? 'Cancel' : 'Connect'}
@@ -403,14 +403,14 @@ const Flowchart = () => {
           <button
             onClick={nextNode}
             disabled={currentNodeIndex >= nodes.length - 1}
-            className="flex items-center gap-2 px-4 py-2 bg-[#004fd9] hover:bg-[#4178d9] disabled:bg-[#3059a0] text-white rounded-lg transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-[#00338D] hover:bg-[#0091DA] disabled:bg-[#002266] text-white rounded-lg transition-colors"
           >
             <SkipForward size={16} />
             Next
           </button>
           <button
             onClick={resetFlow}
-            className="flex items-center gap-2 px-4 py-2 bg-[#3059a0] hover:bg-[#4178d9] text-white rounded-lg transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-[#002266] hover:bg-[#0091DA] text-white rounded-lg transition-colors"
           >
             <RotateCcw size={16} />
             Reset
@@ -428,7 +428,7 @@ const Flowchart = () => {
           <select
             value={newNodeShape}
             onChange={(e) => setNewNodeShape(e.target.value)}
-            className="rounded p-1 bg-[#00215a] text-white border-none focus:ring-2 focus:ring-[#4178d9]"
+            className="rounded p-1 bg-[#00215a] text-white border-none focus:ring-2 focus:ring-[#0091DA]"
           >
             <option value="rectangle">Rectangle</option>
             <option value="square">Square</option>
@@ -471,7 +471,7 @@ const Flowchart = () => {
               <span className="text-white/80">Current</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-[#4178d9] rounded"></div>
+              <div className="w-4 h-4 bg-[#0091DA] rounded"></div>
               <span className="text-white/80">Pending</span>
             </div>
             <div className="flex items-center gap-2">
@@ -491,7 +491,7 @@ const Flowchart = () => {
         <svg className="absolute inset-0 w-full h-full pointer-events-none">
           <defs>
             <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-              <polygon points="0 0, 10 3.5, 0 7" fill="#4178d9" />
+              <polygon points="0 0, 10 3.5, 0 7" fill="#0091DA" />
             </marker>
           </defs>
           {renderConnections()}
@@ -534,7 +534,7 @@ const Flowchart = () => {
                 )}
               </div>
               <button
-                className="type-btn absolute -top-2 -left-2 w-6 h-6 bg-[#00338d] hover:bg-[#004fd9] rounded-full flex items-center justify-center text-white text-xs transition-colors"
+                className="type-btn absolute -top-2 -left-2 w-6 h-6 bg-[#00338d] hover:bg-[#00338D] rounded-full flex items-center justify-center text-white text-xs transition-colors"
                 onClick={(e) => {
                   e.stopPropagation();
                   toggleNodeType(node.id);

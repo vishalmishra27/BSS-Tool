@@ -38,6 +38,8 @@ import UATAutomationPage from './pages/UATAutomationPage';
 import UATAutomationNewPage from './pages/UATAutomationNewPage';
 import AgentChatPage from './pages/AgentChatPage';
 import AgentDescriptionsPage from './pages/AgentDescriptionsPage';
+import LandingPage from './pages/LandingPage';
+import CommandAgentPage from './pages/CommandAgentPage';
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 const IconDashboard = () => (
@@ -90,7 +92,7 @@ const IconNetwork = () => (
 );
 const IconUATAuto = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/>
+    <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/><polygon points="10 8 10 14 15 11 10 8"/>
   </svg>
 );
 const IconMigration = () => (
@@ -120,36 +122,32 @@ const IconChevron = ({ collapsed }) => (
 
 // ─── Nav items with module permission keys ────────────────────────────────────
 const ALL_NAV_ITEMS = [
-  { label: 'Transformation Dashboard', path: '/dashboard',          icon: <IconDashboard />, module: 'dashboard' },
-  { label: 'Milestones',               path: '/milestones',          icon: <IconMilestone />, module: 'milestones' },
-  { label: 'Workflow',                  path: '/workflow',            icon: <IconWorkflow />, module: 'workflow' },
-  { label: 'Reconciliation Dashboard', path: '/reconciliation',      icon: <IconRecon />,     module: 'reconciliation', dot: true },
+  { label: 'Transformation', path: '/dashboard', icon: <IconDashboard />, module: 'dashboard' },
+  { label: 'Milestone Tracker', path: '/milestones', icon: <IconMilestone />, module: 'milestones' },
+  { label: 'Workflow', path: '/workflow', icon: <IconWorkflow />, module: 'workflow' },
+  { label: 'Reconciliation', path: '/reconciliation', icon: <IconRecon />, module: 'reconciliation', dot: true },
   {
     label: 'Product', path: '/product-dashboard', icon: <IconProduct />, module: 'product', dot: true,
-    children: [{ label: 'Product Journey', path: '/product-dashboard' }],
+    children: [{ label: 'Product Lifecycle', path: '/product-dashboard' }],
   },
-  {
-    label: 'UAT Dashboard', path: '/uat', icon: <IconUAT />, module: 'uat', dot: true,
-
-  },
+  { label: 'UAT Dashboard', path: '/uat', icon: <IconUAT />, module: 'uat', dot: true },
   {
     label: 'Enterprise', path: '/enterprise/bpm', icon: <IconEnterprise />, module: 'dashboard', dot: true,
     children: [
-      { label: 'BPM',     path: '/enterprise/bpm' },
-      { label: 'Network', path: '/enterprise/network' },
+      { label: 'Business Process', path: '/enterprise/bpm' },
+      { label: 'Migration Summary', path: '/enterprise/bpm-summary' },
+      { label: 'Network I/O', path: '/enterprise/network' },
+      { label: 'Document Intelligence', path: '/agent/ocr' },
     ],
   },
-  { label: 'UAT Automation', path: '/uat-automation', icon: <IconUATAuto />, module: 'dashboard', dot: true },
-  { label: 'Migration', path: '/migration', icon: <IconMigration />,module: 'dashboard', dot: true },
+  { label: 'Test Automation', path: '/uat-automation', icon: <IconUATAuto />, module: 'dashboard', dot: true },
   {
     label: 'AI Agents', path: '/agent/about', icon: <IconAgent />, module: 'dashboard',
     children: [
-      { label: 'Agent Descriptions', path: '/agent/about' },
-      { label: 'Agent Chat', path: '/agent' },
-      
+      { label: 'Agent Overview', path: '/agent/about' },
+      { label: 'Command Agent', path: '/agent/command' },
     ],
   },
-  //{ label: 'Audit Log', path: '/audit-log', icon: <IconAudit />,    module: 'audit_log' },
 ];
 
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
@@ -163,116 +161,144 @@ function Sidebar({ onLogout }) {
 
   return (
     <div style={{
-      width: isCollapsed ? '52px' : '210px', minHeight: '100vh',
-      background: 'linear-gradient(180deg, #001F5B 0%, #003087 100%)',
+      width: isCollapsed ? '56px' : '230px', minHeight: '100vh',
+      background: 'linear-gradient(180deg, #0a1628 0%, #0f2847 60%, #132e4a 100%)',
       display: 'flex', flexDirection: 'column',
-      transition: 'width 0.25s ease', overflow: 'hidden',
+      transition: 'width 0.25s cubic-bezier(0.4,0,0.2,1)', overflow: 'hidden',
       flexShrink: 0, zIndex: 100, position: 'relative',
+      boxShadow: '4px 0 24px rgba(0,0,0,0.25)',
     }}>
       {/* Logo */}
-<div
-  style={{
-    padding: isCollapsed ? '16px 8px' : '16px 16px',
-    borderBottom: '1px solid rgba(255,255,255,0.1)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: isCollapsed ? 'center' : 'space-between',
-    gap: 8,
-  }}
->
-  {!isCollapsed && (
-    <img
-      src={logo}
-      alt="KPMG Logo"
-      style={{
-        height: '60px',
-        width: 'auto',
-        objectFit: 'contain',
-      }}
-    />
-  )}
+      <div style={{
+        padding: isCollapsed ? '20px 8px' : '20px 18px',
+        borderBottom: '1px solid rgba(255,255,255,0.06)',
+        display: 'flex', alignItems: 'center',
+        justifyContent: isCollapsed ? 'center' : 'space-between',
+        gap: 8,
+      }}>
+        {!isCollapsed && (
+          <NavLink to="/" style={{
+            fontWeight: 800, fontSize: 16, color: '#fff', letterSpacing: 1.5,
+            textDecoration: 'none', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', gap: 10,
+          }}>
+            <span style={{
+              background: 'linear-gradient(135deg, #00B0F0, #0066CC)',
+              borderRadius: 8, width: 28, height: 28,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 13, fontWeight: 900, color: '#fff',
+            }}>B</span>
+            BSS Tool
+          </NavLink>
+        )}
+        <button onClick={toggleSidebar} style={{
+          background: 'rgba(255,255,255,0.06)', border: 'none', cursor: 'pointer',
+          color: 'rgba(255,255,255,0.5)', padding: 6, borderRadius: 6,
+          display: 'flex', alignItems: 'center',
+          transition: 'all 0.15s',
+        }}
+          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.12)'; e.currentTarget.style.color = '#fff'; }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = 'rgba(255,255,255,0.5)'; }}
+        >
+          <IconChevron collapsed={isCollapsed} />
+        </button>
+      </div>
 
-  <button
-    onClick={toggleSidebar}
-    style={{
-      background: 'none',
-      border: 'none',
-      cursor: 'pointer',
-      color: 'rgba(255,255,255,0.7)',
-      padding: 4,
-      borderRadius: 4,
-      display: 'flex',
-      alignItems: 'center',
-    }}
-  >
-    <IconChevron collapsed={isCollapsed} />
-  </button>
-</div>
+      {!isCollapsed && (
+        <div style={{ padding: '10px 18px 6px', fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.25)', textTransform: 'uppercase', letterSpacing: 2 }}>
+          Navigation
+        </div>
+      )}
 
       {/* Nav items */}
-      <nav style={{ flex: 1, paddingTop: 8 }}>
+      <nav style={{ flex: 1, padding: isCollapsed ? '4px 0' : '4px 8px', overflowY: 'auto' }}>
         {navItems.map(item => {
           const isActive = location.pathname === item.path || item.children?.some(c => c.path === location.pathname);
           const isExpanded = expanded[item.label];
+          const activeStyle = {
+            background: 'linear-gradient(90deg, rgba(0,176,240,0.15), rgba(0,176,240,0.05))',
+            color: '#fff',
+            borderLeft: '3px solid #00B0F0',
+          };
+          const inactiveStyle = {
+            background: 'transparent',
+            color: 'rgba(255,255,255,0.55)',
+            borderLeft: '3px solid transparent',
+          };
+          const baseStyle = {
+            display: 'flex', alignItems: 'center', gap: 10,
+            padding: isCollapsed ? '10px 0' : '9px 12px',
+            justifyContent: isCollapsed ? 'center' : 'flex-start',
+            fontSize: 13, fontWeight: isActive ? 600 : 400,
+            borderRadius: isCollapsed ? 0 : 8,
+            flex: 1, minWidth: 0, transition: 'all 0.2s',
+            whiteSpace: 'nowrap', overflow: 'hidden',
+            cursor: 'pointer', textDecoration: 'none',
+            marginBottom: 2,
+          };
+
           return (
             <div key={item.label}>
               <div style={{ display: 'flex', alignItems: 'center' }}>
                 {item.children ? (
                   <div
                     onClick={() => setExpanded(p => ({ ...p, [item.label]: !p[item.label] }))}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 10,
-                      padding: isCollapsed ? '10px 0' : '10px 14px',
-                      justifyContent: isCollapsed ? 'center' : 'flex-start',
-                      color: isActive ? '#ffffff' : 'rgba(255,255,255,0.65)',
-                      cursor: 'pointer',
-                      fontSize: 13, fontWeight: isActive ? 600 : 400,
-                      background: isActive ? 'rgba(255,255,255,0.12)' : 'transparent',
-                      borderLeft: isActive ? '3px solid #00B0F0' : '3px solid transparent',
-                      flex: 1, minWidth: 0, transition: 'all 0.15s', whiteSpace: 'nowrap', overflow: 'hidden',
-                    }}
+                    style={{ ...baseStyle, ...(isActive ? activeStyle : inactiveStyle) }}
+                    onMouseEnter={e => { if (!isActive) { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = '#fff'; } }}
+                    onMouseLeave={e => { if (!isActive) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'rgba(255,255,255,0.55)'; } }}
                   >
-                    <span style={{ flexShrink: 0 }}>{item.icon}</span>
+                    <span style={{ flexShrink: 0, opacity: isActive ? 1 : 0.7 }}>{item.icon}</span>
                     {!isCollapsed && (
                       <>
                         <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.label}</span>
-                        {item.dot && <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#00B0F0', flexShrink: 0, marginRight: 2 }} />}
+                        {item.dot && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#00B0F0', flexShrink: 0 }} />}
+                        <span style={{
+                          fontSize: 8, color: 'rgba(255,255,255,0.35)',
+                          transition: 'transform 0.2s',
+                          transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                        }}>▼</span>
                       </>
                     )}
                   </div>
                 ) : (
                   <NavLink to={item.path} style={({ isActive: na }) => ({
-                    display: 'flex', alignItems: 'center', gap: 10,
-                    padding: isCollapsed ? '10px 0' : '10px 14px',
-                    justifyContent: isCollapsed ? 'center' : 'flex-start',
-                    color: isActive || na ? '#ffffff' : 'rgba(255,255,255,0.65)',
-                    textDecoration: 'none', fontSize: 13, fontWeight: isActive ? 600 : 400,
-                    background: isActive ? 'rgba(255,255,255,0.12)' : 'transparent',
-                    borderLeft: isActive ? '3px solid #00B0F0' : '3px solid transparent',
-                    flex: 1, minWidth: 0, transition: 'all 0.15s', whiteSpace: 'nowrap', overflow: 'hidden',
-                  })}>
-                    <span style={{ flexShrink: 0 }}>{item.icon}</span>
+                    ...baseStyle,
+                    ...((isActive || na) ? activeStyle : inactiveStyle),
+                  })}
+                    onMouseEnter={e => { if (!isActive) { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = '#fff'; } }}
+                    onMouseLeave={e => { if (!isActive) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'rgba(255,255,255,0.55)'; } }}
+                  >
+                    <span style={{ flexShrink: 0, opacity: isActive ? 1 : 0.7 }}>{item.icon}</span>
                     {!isCollapsed && (
                       <>
                         <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.label}</span>
-                        {item.dot && <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#00B0F0', flexShrink: 0, marginRight: 2 }} />}
+                        {item.dot && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#00B0F0', flexShrink: 0 }} />}
                       </>
                     )}
                   </NavLink>
                 )}
-                {!isCollapsed && item.children && (
-                  <button onClick={() => setExpanded(p => ({ ...p, [item.label]: !p[item.label] }))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.5)', padding: '10px 8px', fontSize: 10 }}>
-                    {isExpanded ? '▲' : '▼'}
-                  </button>
-                )}
               </div>
               {!isCollapsed && item.children && isExpanded && (
-                <div style={{ paddingLeft: 32 }}>
-                  {item.children.map(child => (
-                    <NavLink key={child.path} to={child.path} style={({ isActive }) => ({ display: 'block', padding: '7px 12px', color: isActive ? '#fff' : 'rgba(255,255,255,0.55)', textDecoration: 'none', fontSize: 12, background: isActive ? 'rgba(255,255,255,0.08)' : 'transparent', borderRadius: 4, marginBottom: 2 })}>
-                      {child.label}
-                    </NavLink>
-                  ))}
+                <div style={{ marginLeft: 20, paddingLeft: 12, borderLeft: '1px solid rgba(255,255,255,0.08)', marginBottom: 4 }}>
+                  {item.children.map(child => {
+                    const childActive = location.pathname === child.path;
+                    return (
+                      <NavLink key={child.path} to={child.path} style={{
+                        display: 'flex', alignItems: 'center', gap: 8,
+                        padding: '7px 12px', borderRadius: 6, marginBottom: 1,
+                        color: childActive ? '#00B0F0' : 'rgba(255,255,255,0.45)',
+                        textDecoration: 'none', fontSize: 12, fontWeight: childActive ? 600 : 400,
+                        background: childActive ? 'rgba(0,176,240,0.08)' : 'transparent',
+                        transition: 'all 0.15s',
+                      }}
+                        onMouseEnter={e => { if (!childActive) { e.currentTarget.style.color = 'rgba(255,255,255,0.8)'; e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; } }}
+                        onMouseLeave={e => { if (!childActive) { e.currentTarget.style.color = 'rgba(255,255,255,0.45)'; e.currentTarget.style.background = 'transparent'; } }}
+                      >
+                        <span style={{ width: 4, height: 4, borderRadius: '50%', background: childActive ? '#00B0F0' : 'rgba(255,255,255,0.2)', flexShrink: 0 }} />
+                        {child.label}
+                      </NavLink>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -282,17 +308,45 @@ function Sidebar({ onLogout }) {
 
       {/* User info + sign out */}
       {!isCollapsed && auth && (
-        <div style={{ padding: '12px 16px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-          <div style={{ color: 'rgba(255,255,255,0.9)', fontSize: 12, fontWeight: 600, marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{auth.user.full_name}</div>
-          <div style={{ color: '#00B0F0', fontSize: 10, marginBottom: 8, textTransform: 'capitalize' }}>{auth.user.role.replace(/_/g, ' ')}</div>
-          <button onClick={onLogout} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.25)', borderRadius: 4, cursor: 'pointer', color: 'rgba(255,255,255,0.6)', fontSize: 11, padding: '4px 10px', width: '100%' }}>
+        <div style={{ padding: '14px 18px', borderTop: '1px solid rgba(255,255,255,0.06)', background: 'rgba(0,0,0,0.15)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+            <div style={{
+              width: 32, height: 32, borderRadius: 8,
+              background: 'linear-gradient(135deg, #00B0F0, #0066CC)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: '#fff', fontSize: 13, fontWeight: 700, flexShrink: 0,
+            }}>
+              {auth.user.full_name?.charAt(0)?.toUpperCase() || 'U'}
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ color: '#fff', fontSize: 12, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{auth.user.full_name}</div>
+              <div style={{ color: '#00B0F0', fontSize: 10, textTransform: 'capitalize' }}>{auth.user.role.replace(/_/g, ' ')}</div>
+            </div>
+          </div>
+          <button onClick={onLogout} style={{
+            background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: 6, cursor: 'pointer', color: 'rgba(255,255,255,0.5)',
+            fontSize: 11, fontWeight: 500, padding: '6px 0', width: '100%',
+            transition: 'all 0.15s',
+          }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(220,38,38,0.15)'; e.currentTarget.style.borderColor = 'rgba(220,38,38,0.3)'; e.currentTarget.style.color = '#f87171'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; e.currentTarget.style.color = 'rgba(255,255,255,0.5)'; }}
+          >
             Sign Out
           </button>
         </div>
       )}
       {isCollapsed && (
-        <div style={{ padding: '12px 8px', borderTop: '1px solid rgba(255,255,255,0.1)', display: 'flex', justifyContent: 'center' }}>
-          <button onClick={onLogout} title="Sign Out" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.5)', fontSize: 16 }}>⏻</button>
+        <div style={{ padding: '14px 8px', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', justifyContent: 'center' }}>
+          <button onClick={onLogout} title="Sign Out" style={{
+            background: 'rgba(255,255,255,0.06)', border: 'none', cursor: 'pointer',
+            color: 'rgba(255,255,255,0.4)', fontSize: 14, borderRadius: 6,
+            width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            transition: 'all 0.15s',
+          }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(220,38,38,0.15)'; e.currentTarget.style.color = '#f87171'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = 'rgba(255,255,255,0.4)'; }}
+          >⏻</button>
         </div>
       )}
     </div>
@@ -306,9 +360,12 @@ function AppLayout({ onLogout }) {
   return (
     <div style={{ display: 'flex', minHeight: '100vh' }}>
       <Sidebar onLogout={onLogout} />
-      <main style={{ flex: 1, overflow: 'auto', minWidth: 0 }}>
+      <main style={{ flex: 1, overflow: 'auto', minWidth: 0, position: 'relative' }}>
+        <div style={{ position: 'fixed', top: 12, right: 20, zIndex: 50 }}>
+          <img src={logo} alt="KPMG Logo" style={{ height: 60, width: 'auto', objectFit: 'contain' }} />
+        </div>
         <Routes>
-          <Route path="/"                  element={<TransformationDashboardPage />} />
+          <Route path="/"                  element={<LandingPage />} />
           <Route path="/dashboard"         element={<TransformationDashboardPage />} />
           <Route path="/milestones"        element={<ProjectMilestones />} />
           <Route path="/status"            element={<StatusTrackerPage />} />
@@ -321,7 +378,7 @@ function AppLayout({ onLogout }) {
           <Route path="/enterprise/bpm"    element={<Bpm />} />
           <Route path="/enterprise/network" element={<NetworkPage />} />
           <Route path="/uat-automation"     element={<UATAutomationNewPage />} />
-          <Route path="/migration"         element={<Summary />} />
+          <Route path="/enterprise/bpm-summary" element={<Summary />} />
           <Route path="/pdf-analysis"      element={<AnalyticsPage />} />
           <Route path="/analytics"         element={<UserAnalyticsPage />} />
           <Route path="/conversion"        element={<ConversionPage />} />
@@ -338,6 +395,7 @@ function AppLayout({ onLogout }) {
           <Route path="/agent/crud"          element={<CrudAgentPage />} />
           <Route path="/agent/reconciliation" element={<ReconciliationAgentPage />} />
           <Route path="/agent/ocr"            element={<OcrAgentPage />} />
+          <Route path="/agent/command"      element={<CommandAgentPage />} />
           <Route path="/audit-log"         element={<AuditLogPage />} />
         </Routes>
       </main>

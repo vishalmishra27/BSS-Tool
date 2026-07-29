@@ -68,7 +68,7 @@ marginBottom: '0.5rem', }, label: {
 fontWeight: '600', marginRight: '0.5rem', }, commentBox: {
 marginTop: '2rem', }, textarea: {
 width: '100%', minHeight: '80px', background: 'rgba(0, 0, 0, 0.3)', border: '1px solid rgba(255, 255, 255, 0.2)', borderRadius: '8px', padding: '0.75rem', color: '#ffffff', fontSize: '0.9rem', resize: 'vertical', outline: 'none', transition: 'border-color 0.3s ease', }, sendButton: {
-background: 'linear-gradient(135deg, #3b82f6, #2563eb)', color: '#ffffff', border: 'none', borderRadius: '8px', padding: '0.6rem 1.2rem', fontSize: '0.9rem', fontWeight: '600', cursor: 'pointer', transition: 'all 0.3s ease', marginTop: '0.5rem', float: 'right', }, comment: {
+background: 'linear-gradient(135deg, #0091DA, #002266)', color: '#ffffff', border: 'none', borderRadius: '8px', padding: '0.6rem 1.2rem', fontSize: '0.9rem', fontWeight: '600', cursor: 'pointer', transition: 'all 0.3s ease', marginTop: '0.5rem', float: 'right', }, comment: {
 background: 'rgba(255, 255, 255, 0.05)', borderRadius: '8px', padding: '1rem', marginBottom: '1rem', border: '1px solid rgba(255, 255, 255, 0.1)', }, commentText: {
 color: 'rgba(255, 255, 255, 0.9)', lineHeight: '1.5', }, };
 
@@ -112,12 +112,12 @@ style={styles.sendButton}
 onClick={handleSendClick}
 onMouseEnter={(e) => {
 
-e.target.style.background = 'linear-gradient(135deg, #2563eb, #1d4ed8)';
+e.target.style.background = 'linear-gradient(135deg, #002266, #1d4ed8)';
 
 e.target.style.transform = 'translateY(-1px)';
 }}
 onMouseLeave={(e) => {
-e.target.style.background = 'linear-gradient(135deg, #3b82f6, #2563eb)';
+e.target.style.background = 'linear-gradient(135deg, #0091DA, #002266)';
 e.target.style.transform = 'translateY(0)';
 }}>
 Send

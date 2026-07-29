@@ -1,15 +1,18 @@
 // KPMG brand theme tokens — shared across all pages/components.
-// Colors sourced from KPMG Brand Identity Guidelines (Primary & Secondary palette).
+// Colors sourced from KPMG Brand Identity Guidelines.
 
 export const colors = {
-  // Primary palette
-  kpmgBlue: '#003087',
-  kpmgBlueLight: '#0066CC',
+  // KPMG Primary palette
+  kpmgBlue: '#00338D',
+  kpmgBlueLight: '#0091DA',
   navy: '#001F5B',
+  navyDark: '#0a1628',
+  navyMid: '#0f2847',
+  purple: '#483698',
   white: '#FFFFFF',
   black: '#0A0A0A',
 
-  // Gray scale (Cool Gray 9 tints)
+  // Gray scale
   gray900: '#222222',
   gray700: '#4A4A4A',
   gray500: '#6B7280',
@@ -17,7 +20,7 @@ export const colors = {
   gray100: '#E5E7EB',
   grayBg: '#F4F6FA',
 
-  // Secondary accents (status / data viz)
+  // Status / accent
   green: '#16A34A',
   greenLight: '#DCFCE7',
   red: '#DC2626',
@@ -25,7 +28,6 @@ export const colors = {
   amber: '#D97706',
   amberLight: '#FEF3C7',
   teal: '#0EA5A5',
-  purple: '#7C3AED',
 
   // Surfaces
   bgPage: '#F4F6FA',
@@ -35,8 +37,12 @@ export const colors = {
 };
 
 export const gradients = {
-  kpmgBlue: 'linear-gradient(90deg, #003087 0%, #0066CC 100%)',
-  sidebar: 'linear-gradient(180deg, #001F5B 0%, #003087 100%)',
+  primary: 'linear-gradient(135deg, #00338D 0%, #0091DA 100%)',
+  primaryDark: 'linear-gradient(135deg, #0a1628 0%, #0f2847 50%, #132e4a 100%)',
+  header: 'linear-gradient(135deg, #00338D 0%, #0091DA 100%)',
+  sidebar: 'linear-gradient(180deg, #0a1628 0%, #0f2847 60%, #132e4a 100%)',
+  card: 'linear-gradient(135deg, #00338D 0%, #002266 100%)',
+  purple: 'linear-gradient(135deg, #483698 0%, #2D1F6B 100%)',
 };
 
 export const spacing = {

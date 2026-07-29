@@ -16,10 +16,27 @@ const PHASE_NAMES = {
 const phaseNum = (phase_id) => phase_id?.replace('phase', '') || '';
 
 const STATUS_COLOUR = {
-  complete: '#16a34a',
-  current:  '#d97706',
-  pending:  '#9ca3af',
+  complete:  '#16a34a',
+  current:   '#d97706',
+  pending:   '#9ca3af',
+  overdue:   '#dc2626',
 };
+
+// Derive visual status from checklist counts + end date
+function deriveVisualStatus(phase) {
+  const total = phase.checklist_total || 0;
+  const done = phase.checklist_done || 0;
+  const allComplete = total > 0 && done === total;
+  const anyStarted = done > 0;
+  const endDate = phase.end_dt ? new Date(phase.end_dt) : null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  if (allComplete) return 'complete';
+  if (endDate && endDate < today && !allComplete) return 'overdue';
+  if (phase.curr_status === 'current' || anyStarted) return 'current';
+  return 'pending';
+}
 
 // ─── Expandable Checklist Item ───────────────────────────────────────────────
 function ChecklistItemRow({ item, readOnly, onToggle }) {
@@ -216,7 +233,7 @@ function ChecklistItemRow({ item, readOnly, onToggle }) {
                         </span>
                         <a
                           href={`/api/checklist/attachments/download/${a.id}`}
-                          style={{ fontSize: 11, color: '#0070c0', textDecoration: 'none', fontWeight: 600 }}
+                          style={{ fontSize: 11, color: '#0091DA', textDecoration: 'none', fontWeight: 600 }}
                         >
                           Download
                         </a>
@@ -265,13 +282,15 @@ export default function WorkflowTrackerPage({ canComment = true, canUpload = tru
   const [submittingPhase, setSubmittingPhase] = useState(false);
 
   useEffect(() => {
-    fetch('/api/phases')
+    fetch('/api/phases/summary')
       .then(r => r.json())
       .then(data => {
-        const sorted = [...data].sort((a, b) => parseInt(a.phase_id) - parseInt(b.phase_id));
+        const sorted = [...data]
+          .sort((a, b) => parseInt(a.phase_id) - parseInt(b.phase_id))
+          .map(p => ({ ...p, visual_status: deriveVisualStatus(p) }));
         setPhases(sorted);
         const fromUrl = initialPhaseId ? sorted.find(p => p.phase_id === initialPhaseId) : null;
-        const current = fromUrl || sorted.find(p => p.curr_status === 'current') || sorted[0];
+        const current = fromUrl || sorted.find(p => p.visual_status === 'current') || sorted[0];
         if (current) setSelectedPhase(current);
         setLoadingPhases(false);
       })
@@ -314,8 +333,8 @@ export default function WorkflowTrackerPage({ canComment = true, canUpload = tru
           body: JSON.stringify({ curr_status: 'current' }),
         });
       }
-      const refreshed = await fetch('/api/phases').then(r => r.json());
-      const sorted = [...refreshed].sort((a, b) => parseInt(a.phase_id) - parseInt(b.phase_id));
+      const refreshed = await fetch('/api/phases/summary').then(r => r.json());
+      const sorted = [...refreshed].sort((a, b) => parseInt(a.phase_id) - parseInt(b.phase_id)).map(p => ({ ...p, visual_status: deriveVisualStatus(p) }));
       setPhases(sorted);
       const updated = sorted.find(p => p.phase_id === selectedPhase.phase_id);
       if (updated) setSelectedPhase(updated);
@@ -343,8 +362,8 @@ export default function WorkflowTrackerPage({ canComment = true, canUpload = tru
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ curr_status: 'current' }),
       });
-      const refreshed = await fetch('/api/phases').then(r => r.json());
-      const sorted = [...refreshed].sort((a, b) => parseInt(a.phase_id) - parseInt(b.phase_id));
+      const refreshed = await fetch('/api/phases/summary').then(r => r.json());
+      const sorted = [...refreshed].sort((a, b) => parseInt(a.phase_id) - parseInt(b.phase_id)).map(p => ({ ...p, visual_status: deriveVisualStatus(p) }));
       setPhases(sorted);
       const updated = sorted.find(p => p.phase_id === selectedPhase.phase_id);
       if (updated) setSelectedPhase(updated);
@@ -397,13 +416,13 @@ export default function WorkflowTrackerPage({ canComment = true, canUpload = tru
                   display: 'flex', alignItems: 'center', gap: 10,
                   width: '100%', padding: '10px 14px', textAlign: 'left',
                   background: selectedPhase?.id === phase.id ? '#f0f4ff' : '#fff',
-                  borderLeft: selectedPhase?.id === phase.id ? '3px solid #0070c0' : '3px solid transparent',
+                  borderLeft: selectedPhase?.id === phase.id ? '3px solid #0091DA' : '3px solid transparent',
                   border: 'none', borderBottom: '1px solid #f0f0f0', cursor: 'pointer',
                 }}
               >
                 <span style={{
                   width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
-                  background: STATUS_COLOUR[phase.curr_status] || '#9ca3af',
+                  background: STATUS_COLOUR[phase.visual_status] || STATUS_COLOUR[phase.curr_status] || '#9ca3af',
                 }} />
                 <div>
                   <div style={{ fontSize: 12, fontWeight: 600, color: '#222' }}>Phase {phaseNum(phase.phase_id)}</div>
@@ -435,10 +454,13 @@ export default function WorkflowTrackerPage({ canComment = true, canUpload = tru
                   </div>
                   <span style={{
                     padding: '4px 12px', borderRadius: 12, fontSize: 12, fontWeight: 600,
-                    background: selectedPhase.curr_status === 'complete' ? '#dcfce7' : selectedPhase.curr_status === 'current' ? '#fef3c7' : '#f1f5f9',
-                    color: STATUS_COLOUR[selectedPhase.curr_status] || '#555',
+                    background: (selectedPhase.visual_status || selectedPhase.curr_status) === 'complete' ? '#dcfce7'
+                      : (selectedPhase.visual_status || selectedPhase.curr_status) === 'overdue' ? '#fee2e2'
+                      : (selectedPhase.visual_status || selectedPhase.curr_status) === 'current' ? '#fef3c7'
+                      : '#f1f5f9',
+                    color: STATUS_COLOUR[selectedPhase.visual_status || selectedPhase.curr_status] || '#555',
                   }}>
-                    {selectedPhase.curr_status}
+                    {(selectedPhase.visual_status || selectedPhase.curr_status) === 'overdue' ? 'Overdue' : selectedPhase.curr_status}
                   </span>
                 </div>
 
@@ -449,7 +471,7 @@ export default function WorkflowTrackerPage({ canComment = true, canUpload = tru
                       <span><b>{completedCount}/{totalCount}</b> items complete</span>
                     </div>
                     <div style={{ height: 8, background: '#e5e7eb', borderRadius: 4, overflow: 'hidden' }}>
-                      <div style={{ height: '100%', width: `${pct}%`, background: pct === 100 ? '#16a34a' : '#0070c0', borderRadius: 4, transition: 'width 0.3s' }} />
+                      <div style={{ height: '100%', width: `${pct}%`, background: pct === 100 ? '#16a34a' : (selectedPhase.visual_status === 'overdue' ? '#dc2626' : '#0091DA'), borderRadius: 4, transition: 'width 0.3s' }} />
                     </div>
                   </div>
                 )}
@@ -528,7 +550,7 @@ export default function WorkflowTrackerPage({ canComment = true, canUpload = tru
                       {c.comment}
                     </div>
                     {c.attachment_name && (
-                      <div style={{ marginTop: 6, fontSize: 12, color: '#0070c0' }}>📎 {c.attachment_name}</div>
+                      <div style={{ marginTop: 6, fontSize: 12, color: '#0091DA' }}>📎 {c.attachment_name}</div>
                     )}
                   </div>
                 ))}
@@ -588,7 +610,7 @@ export default function WorkflowTrackerPage({ canComment = true, canUpload = tru
   );
 }
 
-const btnBlue = { padding: '7px 16px', background: '#0070c0', color: '#fff', border: 'none', borderRadius: 5, fontSize: 12, fontWeight: 600, cursor: 'pointer' };
+const btnBlue = { padding: '7px 16px', background: '#0091DA', color: '#fff', border: 'none', borderRadius: 5, fontSize: 12, fontWeight: 600, cursor: 'pointer' };
 const btnGreen = { padding: '7px 16px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 5, fontSize: 12, fontWeight: 600, cursor: 'pointer' };
 const btnGray = { padding: '7px 16px', background: '#f1f5f9', color: '#444', border: '1px solid #d1d5db', borderRadius: 5, fontSize: 12, cursor: 'pointer' };
 const overlay = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 9000, display: 'flex', alignItems: 'center', justifyContent: 'center' };

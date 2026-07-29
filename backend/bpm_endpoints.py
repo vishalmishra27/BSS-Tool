@@ -14,7 +14,9 @@ Schema is created on backend boot via ensure_bpm_schema() (called from app.py).
 """
 
 import logging
-from flask import Blueprint, request, jsonify
+import os
+from flask import Blueprint, request, jsonify, send_file
+from werkzeug.utils import secure_filename
 
 from auth_service import (
     require_auth,
@@ -30,6 +32,9 @@ from auth_service import (
 logger = logging.getLogger(__name__)
 
 bpm_bp = Blueprint('bpm', __name__)
+
+BPM_UPLOAD_DIR = os.path.join(os.path.dirname(__file__), 'bpm_uploads')
+os.makedirs(BPM_UPLOAD_DIR, exist_ok=True)
 
 # `query` is injected from app.py at registration time to reuse the single
 # DB-config / connection helper rather than re-opening a second pool.
@@ -79,11 +84,24 @@ CREATE TABLE IF NOT EXISTS task_comments (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS task_attachments (
+    id           SERIAL PRIMARY KEY,
+    task_id      INTEGER      NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+    file_name    VARCHAR(255) NOT NULL,
+    file_path    TEXT         NOT NULL,
+    uploaded_by  INTEGER      NOT NULL REFERENCES users(id),
+    created_at   TIMESTAMPTZ  DEFAULT NOW()
+);
+
 -- Extend the existing users table (idempotent):
 --   manager_id : which engagement manager a worker reports to
 --   is_demo    : seed/demo accounts, hidden from the user-management view
 ALTER TABLE users ADD COLUMN IF NOT EXISTS manager_id INTEGER REFERENCES users(id);
 ALTER TABLE users ADD COLUMN IF NOT EXISTS is_demo BOOLEAN DEFAULT FALSE;
+
+-- Recurrence support on tasks
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS recurrence_type VARCHAR(20) DEFAULT 'none';
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS recurrence_days VARCHAR(50);
 """
 
 # Seed accounts created by seed_users.py — login still works, but they are
@@ -304,17 +322,22 @@ def create_task(current_user):
         if err:
             return jsonify({'error': err}), status
 
+    recurrence_type = data.get('recurrence_type') or 'none'
+    recurrence_days = data.get('recurrence_days') or None  # e.g. "mon,wed,fri"
+
     code = _next_task_code(project['code'], project['id'])
     row = _query(
         """
         INSERT INTO tasks (code, project_id, title, description, assignee_id,
-                           status, start_date, end_date, assigned_by)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                           status, start_date, end_date, assigned_by,
+                           recurrence_type, recurrence_days)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         RETURNING *
         """,
         (code, project_id, title, data.get('description'), assignee_id or None,
          data.get('status') or 'todo', data.get('start_date') or None,
-         data.get('end_date') or None, int(current_user['sub'])),
+         data.get('end_date') or None, int(current_user['sub']),
+         recurrence_type, recurrence_days),
         fetch='one',
     )
     return jsonify(row), 201
@@ -352,18 +375,21 @@ def update_task(current_user, task_id):
     row = _query(
         """
         UPDATE tasks SET
-          title       = COALESCE(%s, title),
-          description = COALESCE(%s, description),
-          assignee_id = CASE WHEN %s THEN %s ELSE assignee_id END,
-          status      = COALESCE(%s, status),
-          start_date  = COALESCE(%s, start_date),
-          end_date    = COALESCE(%s, end_date),
-          updated_at  = NOW()
+          title           = COALESCE(%s, title),
+          description     = COALESCE(%s, description),
+          assignee_id     = CASE WHEN %s THEN %s ELSE assignee_id END,
+          status          = COALESCE(%s, status),
+          start_date      = COALESCE(%s, start_date),
+          end_date        = COALESCE(%s, end_date),
+          recurrence_type = COALESCE(%s, recurrence_type),
+          recurrence_days = COALESCE(%s, recurrence_days),
+          updated_at      = NOW()
         WHERE id=%s RETURNING *
         """,
         (data.get('title'), data.get('description'),
          assignee_id != '__keep__', (assignee_id or None) if assignee_id != '__keep__' else None,
-         data.get('status'), data.get('start_date'), data.get('end_date'), task_id),
+         data.get('status'), data.get('start_date'), data.get('end_date'),
+         data.get('recurrence_type'), data.get('recurrence_days'), task_id),
         fetch='one',
     )
     return jsonify(row)
@@ -432,6 +458,85 @@ def add_comment(current_user, task_id):
         (task_id, int(current_user['sub']), body), fetch='one',
     )
     return jsonify(row), 201
+
+
+# ─── Task attachments (assignee + owning manager) ────────────────────────────────
+@bpm_bp.route('/tasks/<int:task_id>/attachments', methods=['GET'])
+@require_auth
+def list_attachments(current_user, task_id):
+    rows = _query(
+        """
+        SELECT a.*, u.full_name AS uploader_name
+        FROM task_attachments a LEFT JOIN users u ON u.id = a.uploaded_by
+        WHERE a.task_id=%s ORDER BY a.created_at DESC
+        """,
+        (task_id,),
+    )
+    return jsonify(list(rows))
+
+
+@bpm_bp.route('/tasks/<int:task_id>/attachments', methods=['POST'])
+@require_auth
+def upload_attachment(current_user, task_id):
+    if current_user['role'] in CLIENT_ROLES:
+        return jsonify({'error': 'Read-only role'}), 403
+    task = _load_task(task_id)
+    if not task:
+        return jsonify({'error': 'Task not found'}), 404
+    is_owner_mgr = _is_superadmin(current_user) or task['owner_manager_id'] == int(current_user['sub'])
+    is_assignee = task['assignee_id'] == int(current_user['sub'])
+    if not (is_owner_mgr or is_assignee):
+        return jsonify({'error': 'You may only attach files to tasks assigned to you'}), 403
+
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file provided'}), 400
+    f = request.files['file']
+    if not f.filename:
+        return jsonify({'error': 'Empty filename'}), 400
+
+    task_dir = os.path.join(BPM_UPLOAD_DIR, str(task_id))
+    os.makedirs(task_dir, exist_ok=True)
+    safe_name = secure_filename(f.filename)
+    file_path = os.path.join(task_dir, safe_name)
+    f.save(file_path)
+
+    row = _query(
+        """
+        INSERT INTO task_attachments (task_id, file_name, file_path, uploaded_by)
+        VALUES (%s, %s, %s, %s) RETURNING *
+        """,
+        (task_id, safe_name, file_path, int(current_user['sub'])),
+        fetch='one',
+    )
+    return jsonify(row), 201
+
+
+@bpm_bp.route('/attachments/<int:attachment_id>/download', methods=['GET'])
+@require_auth
+def download_attachment(current_user, attachment_id):
+    row = _query("SELECT * FROM task_attachments WHERE id=%s", (attachment_id,), fetch='one')
+    if not row:
+        return jsonify({'error': 'Attachment not found'}), 404
+    return send_file(row['file_path'], as_attachment=True, download_name=row['file_name'])
+
+
+@bpm_bp.route('/attachments/<int:attachment_id>', methods=['DELETE'])
+@require_auth
+def delete_attachment(current_user, attachment_id):
+    row = _query("SELECT * FROM task_attachments WHERE id=%s", (attachment_id,), fetch='one')
+    if not row:
+        return jsonify({'error': 'Attachment not found'}), 404
+    task = _load_task(row['task_id'])
+    is_owner_mgr = _is_superadmin(current_user) or task['owner_manager_id'] == int(current_user['sub'])
+    is_uploader = row['uploaded_by'] == int(current_user['sub'])
+    if not (is_owner_mgr or is_uploader):
+        return jsonify({'error': 'Only the uploader or owning manager may delete attachments'}), 403
+    try:
+        os.remove(row['file_path'])
+    except OSError:
+        pass
+    _query("DELETE FROM task_attachments WHERE id=%s", (attachment_id,), fetch=None)
+    return jsonify({'ok': True})
 
 
 # ─── Assignable users (for the assignee dropdown) ───────────────────────────────

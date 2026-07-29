@@ -181,22 +181,22 @@ const Task = () => {
       }
 
       .task-scrollbar::-webkit-scrollbar-thumb {
-        background: linear-gradient(45deg, #0066CC, #003087);
+        background: linear-gradient(45deg, #0091DA, #00338D);
         border-radius: 10px;
         border: 1px solid #E0E8F0;
       }
 
       .task-scrollbar::-webkit-scrollbar-thumb:hover {
-        background: linear-gradient(45deg, #003087, #001F5B);
+        background: linear-gradient(45deg, #00338D, #001F5B);
       }
 
       .task-scrollbar {
         scrollbar-width: thin;
-        scrollbar-color: #0066CC #F4F6FA;
+        scrollbar-color: #0091DA #F4F6FA;
       }
 
       .status-select option[value="OPEN"] {
-        background-color: #3b82f6 !important;
+        background-color: #0091DA !important;
         color: #ffffff !important;
       }
 
@@ -300,7 +300,7 @@ const Task = () => {
   const getStatusColor = (status) => {
     switch (status) {
       case 'OPEN':
-        return { bg: '#3b82f6', border: '#2563eb' };
+        return { bg: '#0091DA', border: '#002266' };
       case 'REOPENED':
         return { bg: '#f59e0b', border: '#d97706' };
       case 'CLOSED':
@@ -364,7 +364,7 @@ const Task = () => {
       boxShadow: '0 2px 12px rgba(0, 31, 91, 0.06)',
     },
     tableHeader: {
-      background: 'linear-gradient(90deg, #003087 0%, #0066CC 100%)',
+      background: 'linear-gradient(90deg, #00338D 0%, #0091DA 100%)',
     },
     tableHeaderCell: {
       padding: '1rem 1.5rem',
@@ -393,7 +393,7 @@ const Task = () => {
     },
     clickableNumber: {
       cursor: 'pointer',
-      color: '#0066CC',
+      color: '#0091DA',
       fontWeight: '600',
       textDecoration: 'underline',
       transition: 'all 0.3s ease',
@@ -401,7 +401,7 @@ const Task = () => {
     },
     clickableTestCase: {
       cursor: 'pointer',
-      color: '#003087',
+      color: '#00338D',
       fontWeight: '600',
       textDecoration: 'underline',
       transition: 'all 0.3s ease',
@@ -423,7 +423,7 @@ const Task = () => {
       color: '#ffffff',
     },
     priorityLow: {
-      background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
+      background: 'linear-gradient(135deg, #0091DA, #002266)',
       color: '#ffffff',
     },
     summaryContainer: {
@@ -447,7 +447,7 @@ const Task = () => {
     issueKey: {
       fontSize: '1.1rem',
       fontWeight: '600',
-      color: '#0066CC',
+      color: '#0091DA',
       marginBottom: '0.5rem',
     },
     issueTitle: {
@@ -508,7 +508,7 @@ const Task = () => {
       transition: 'border-color 0.3s ease',
     },
     sendButton: {
-      background: 'linear-gradient(90deg, #003087 0%, #0066CC 100%)',
+      background: 'linear-gradient(90deg, #00338D 0%, #0091DA 100%)',
       color: '#ffffff',
       border: 'none',
       borderRadius: '8px',
@@ -529,7 +529,7 @@ const Task = () => {
     },
     commentAuthor: {
       fontWeight: '600',
-      color: '#003087',
+      color: '#00338D',
       marginBottom: '0.25rem',
     },
     commentDate: {
@@ -600,7 +600,7 @@ const Task = () => {
     },
     attachmentItem: {
       padding: '0.5rem 0',
-      color: '#0066CC',
+      color: '#0091DA',
       fontSize: '0.85rem',
     },
   };
@@ -651,11 +651,11 @@ const Task = () => {
                         style={styles.clickableNumber}
                         onClick={() => handleNumberClick(lob.name, status.label, count)}
                         onMouseEnter={(e) => {
-                          e.target.style.color = '#3b82f6';
+                          e.target.style.color = '#0091DA';
                           e.target.style.transform = 'scale(1.1)';
                         }}
                         onMouseLeave={(e) => {
-                          e.target.style.color = '#60a5fa';
+                          e.target.style.color = '#0091DA';
                           e.target.style.transform = 'scale(1)';
                         }}
                       >
@@ -783,18 +783,18 @@ const Task = () => {
                 placeholder="Add a comment..."
                 value={commentInput}
                 onChange={handleCommentChange}
-                onFocus={(e) => (e.target.style.borderColor = '#0066CC')}
+                onFocus={(e) => (e.target.style.borderColor = '#0091DA')}
                 onBlur={(e) => (e.target.style.borderColor = '#E0E8F0')}
               />
               <button
                 style={styles.sendButton}
                 onClick={handleSendClick}
                 onMouseEnter={(e) => {
-                  e.target.style.background = 'linear-gradient(90deg, #001F5B 0%, #003087 100%)';
+                  e.target.style.background = 'linear-gradient(90deg, #001F5B 0%, #00338D 100%)';
                   e.target.style.transform = 'translateY(-1px)';
                 }}
                 onMouseLeave={(e) => {
-                  e.target.style.background = 'linear-gradient(90deg, #003087 0%, #0066CC 100%)';
+                  e.target.style.background = 'linear-gradient(90deg, #00338D 0%, #0091DA 100%)';
                   e.target.style.transform = 'translateY(0)';
                 }}
               >
@@ -854,7 +854,7 @@ const Task = () => {
                     ? { color: '#ef4444' }
                     : selectedSummaryData.priority === 'Major'
                     ? { color: '#f97316' }
-                    : { color: '#3b82f6' }),
+                    : { color: '#0091DA' }),
                 }}
               >
                 {selectedSummaryData.priority}

@@ -92,7 +92,7 @@ export default function ProductDashboardPage() {
   });
 
   if (loading) {
-    return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F4F6FA', color: '#0066CC' }}>Loading...</div>;
+    return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F4F6FA', color: '#0091DA' }}>Loading...</div>;
   }
 
   return (
@@ -160,7 +160,7 @@ export default function ProductDashboardPage() {
 
       {/* ──── Section 2: Configuration Overview ───────────────────────────────── */}
       <div style={{ background: '#FFFFFF', border: '1px solid #E0E8F0', borderRadius: 12, padding: 24, marginBottom: 24 }}>
-        <h2 style={{ fontSize: 18, fontWeight: 700, color: '#0066CC', margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <h2 style={{ fontSize: 18, fontWeight: 700, color: '#0091DA', margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: 8 }}>
           <span>⚙️</span> Configuration Overview
         </h2>
         {/* Progress bar */}
@@ -170,7 +170,7 @@ export default function ProductDashboardPage() {
             <span style={{ color: '#16A34A', fontWeight: 700 }}>{configPct}%</span>
           </div>
           <div style={{ background: '#E0E8F0', borderRadius: 6, height: 10, overflow: 'hidden' }}>
-            <div style={{ width: `${configPct}%`, height: '100%', background: 'linear-gradient(90deg, #0066CC, #16A34A)', borderRadius: 6, transition: 'width 0.5s' }} />
+            <div style={{ width: `${configPct}%`, height: '100%', background: 'linear-gradient(90deg, #0091DA, #16A34A)', borderRadius: 6, transition: 'width 0.5s' }} />
           </div>
         </div>
         <div style={{ display: 'flex', gap: 16, marginBottom: 20 }}>
@@ -185,7 +185,7 @@ export default function ProductDashboardPage() {
         </div>
 
         {/* Configuration Validation — Top Performing LOBs */}
-        <h3 style={{ fontSize: 14, fontWeight: 700, color: '#0066CC', margin: '0 0 4px' }}>Configuration Validation</h3>
+        <h3 style={{ fontSize: 14, fontWeight: 700, color: '#0091DA', margin: '0 0 4px' }}>Configuration Validation</h3>
         <p style={{ fontSize: 10, color: '#9CA3AF', margin: '0 0 12px' }}>Top Performing LOBs Section - Integrated into Configuration Overview</p>
         <h4 style={{ fontSize: 13, fontWeight: 700, margin: '0 0 10px', color: '#222222', display: 'flex', alignItems: 'center', gap: 6 }}>🏆 Top Performing LOBs</h4>
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
@@ -280,7 +280,7 @@ export default function ProductDashboardPage() {
       <div style={{ background: '#FFFFFF', border: '1px solid #E0E8F0', borderRadius: 12, padding: 24 }}>
         <h2 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 16px', color: '#001F5B' }}>Quick Actions</h2>
         <button onClick={() => setView(v => v === 'list' ? 'journey' : 'list')}
-          style={{ width: '100%', padding: '14px 20px', borderRadius: 8, border: 'none', background: 'linear-gradient(90deg, #003087 0%, #0066CC 100%)', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
+          style={{ width: '100%', padding: '14px 20px', borderRadius: 8, border: 'none', background: 'linear-gradient(90deg, #00338D 0%, #0091DA 100%)', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
           View Product List
         </button>
       </div>
@@ -315,7 +315,7 @@ function ProductListModal({ onClose }) {
       <div style={{ background: '#fff', borderRadius: 12, width: '90%', maxWidth: 900, maxHeight: '80vh', overflow: 'auto', color: '#1e293b', padding: 24 }}
         onClick={e => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: '#1e40af' }}>Legacy Products Inventory</h2>
+          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: '#00338D' }}>Legacy Products Inventory</h2>
           <div style={{ display: 'flex', gap: 8 }}>
             <select value={lobFilter} onChange={e => setLobFilter(e.target.value)} style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 12 }}>
               <option value="">All LoBs</option>
@@ -325,13 +325,13 @@ function ProductListModal({ onClose }) {
               <option value="">All Statuses</option>
               {statuses.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
-            <button onClick={onClose} style={{ padding: '6px 14px', borderRadius: 6, border: 'none', background: '#1e40af', color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: 12 }}>Close</button>
+            <button onClick={onClose} style={{ padding: '6px 14px', borderRadius: 6, border: 'none', background: '#00338D', color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: 12 }}>Close</button>
           </div>
         </div>
         {loading ? <div>Loading...</div> : (
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
-              <tr style={{ background: 'linear-gradient(135deg, #1e40af, #3b82f6)', color: '#fff' }}>
+              <tr style={{ background: 'linear-gradient(135deg, #00338D, #0091DA)', color: '#fff' }}>
                 {['Product ID', 'Product Name', 'LOB', 'Status', 'Pending On'].map(h => (
                   <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600 }}>{h}</th>
                 ))}

@@ -301,7 +301,7 @@ export default function OcrAgentPage() {
       {/* Header */}
       <div style={{ padding: '14px 24px', borderBottom: '1px solid #e8eef8', background: '#fff', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ width: 32, height: 32, background: 'linear-gradient(135deg,#00C4A7,#001F5B)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 16 }}>✦</div>
+          <div style={{ width: 32, height: 32, background: 'linear-gradient(135deg,#00338D,#0091DA)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 16 }}>✦</div>
           <div>
             <div style={{ fontWeight: 700, fontSize: 15, color: '#001F5B' }}>Document Analysis Agent</div>
             <div style={{ fontSize: 12, color: '#888' }}>Upload readable PDFs — extract text, flag discrepancies, export to Excel</div>
@@ -320,7 +320,7 @@ export default function OcrAgentPage() {
         {/* ── Empty state ── */}
         {showEmpty && (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 32, gap: 24 }}>
-            <div style={{ width: 60, height: 60, background: 'linear-gradient(135deg,#00C4A7,#001F5B)', borderRadius: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, color: '#fff' }}>✦</div>
+            <div style={{ width: 60, height: 60, background: 'linear-gradient(135deg,#00338D,#0091DA)', borderRadius: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, color: '#fff' }}>✦</div>
             <div style={{ textAlign: 'center' }}>
               <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: '#111' }}>What documents shall I analyse?</h2>
               <p style={{ margin: '8px 0 0', color: '#666', fontSize: 14 }}>
@@ -412,7 +412,7 @@ export default function OcrAgentPage() {
                   <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
                     <div style={{
                       width: 30, height: 30, borderRadius: 8, flexShrink: 0,
-                      background: 'linear-gradient(135deg,#00C4A7,#001F5B)',
+                      background: 'linear-gradient(135deg,#00338D,#0091DA)',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       color: '#fff', fontSize: 14, marginTop: 2,
                     }}>✦</div>
@@ -475,7 +475,7 @@ export default function OcrAgentPage() {
 
             {loading && (
               <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 18 }}>
-                <div style={{ width: 30, height: 30, borderRadius: 8, background: 'linear-gradient(135deg,#00C4A7,#001F5B)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 14, flexShrink: 0, marginTop: 2 }}>✦</div>
+                <div style={{ width: 30, height: 30, borderRadius: 8, background: 'linear-gradient(135deg,#00338D,#0091DA)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 14, flexShrink: 0, marginTop: 2 }}>✦</div>
                 <div style={{ padding: '12px 16px', background: '#fff', border: '1px solid #e4eaf6', borderRadius: '3px 14px 14px 14px', fontSize: 14, color: '#888', display: 'flex', gap: 5, alignItems: 'center' }}>
                   <Dot delay={0} /><Dot delay={0.2} /><Dot delay={0.4} />
                   &nbsp; Analysing documents…

@@ -154,8 +154,8 @@ const AllProjects = () => {
     <style>{`
       ::-webkit-scrollbar { width: 10px; }
       ::-webkit-scrollbar-track { background: #F4F6FA; border-radius: 10px; }
-      ::-webkit-scrollbar-thumb { background: #003087; border-radius: 10px; }
-      ::-webkit-scrollbar-thumb:hover { background: #0066CC; }
+      ::-webkit-scrollbar-thumb { background: #00338D; border-radius: 10px; }
+      ::-webkit-scrollbar-thumb:hover { background: #0091DA; }
     `}</style>
   );
 
@@ -214,7 +214,7 @@ const AllProjects = () => {
       color: '#222222'
     },
     createBtn: {
-      backgroundColor: '#003087',
+      backgroundColor: '#00338D',
       border: 'none',
       borderRadius: '20px',
       padding: '8px 25px',
@@ -244,7 +244,7 @@ const AllProjects = () => {
       fontSize: '0.9rem'
     },
     projectCodeCell: {
-      color: '#0066CC',
+      color: '#0091DA',
       fontWeight: 'bold',
       cursor: 'pointer',
       textDecoration: 'none'
@@ -315,7 +315,7 @@ const AllProjects = () => {
       padding: '10px 20px',
       borderRadius: '5px',
       border: 'none',
-      background: '#003087',
+      background: '#00338D',
       color: '#fff',
       cursor: 'pointer'
     },

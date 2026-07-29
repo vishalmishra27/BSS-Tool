@@ -1,51 +1,23 @@
-import { Database, PenLine, FileSearch, FileText, Sparkles, ArrowRight } from 'lucide-react';
+import { useState } from 'react';
+import { PenLine, FileText, Sparkles, ArrowRight, X, MessageSquare } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const AGENTS = [
   {
-    id: 'data', name: 'Data Management Agent', command: '/data',
-    icon: Database, color: 'blue',
-    colorClass: 'bg-blue-500 shadow-blue-500/20',
-    tagline: 'Your database operations co-pilot',
-    desc: 'Upload CSV/PSV files, sanitize and clean data, run SQL queries, manage database tables, and bulk-load data into PostgreSQL — all through natural language conversation.',
-    capabilities: [
-      'Upload & parse CSV, PSV, and TXT files with automatic delimiter detection',
-      'Sanitize data: clean headers, trim whitespace, remove duplicates',
-      'Execute read-only SQL queries and display results',
-      'Create, alter, and drop database tables with confirmation',
-      'Bulk-load cleaned data into PostgreSQL tables',
-      'View table schemas, row counts, and column types',
-    ],
-  },
-  {
     id: 'crud', name: 'CRUD Operations Agent', command: '/crud',
     icon: PenLine, color: 'violet',
     colorClass: 'bg-violet-500 shadow-violet-500/20',
-    tagline: 'Safe database writes with approval workflows',
-    desc: 'Perform Create, Read, Update, and Delete operations on your database using natural language. Every write operation shows a diff preview and requires your explicit approval before execution.',
+    tagline: 'Control dashboards, workflows & lifecycles via prompts',
+    desc: 'Manage all core BSS modules through natural language prompts. Control the Transformation Dashboard, Workflow Tracker, Product Lifecycle, and UAT Lifecycle — create, update, and query records with AI-generated SQL. Every write operation shows a diff preview and requires your explicit approval before execution.',
     capabilities: [
-      'Natural language to SQL generation for CRUD operations',
-      'Diff preview: see before/after values before any write executes',
-      'Approve or reject each operation individually',
-      'Bulk update support with row count confirmation',
-      'Full audit trail of all confirmed and rejected operations',
-      'Read operations execute immediately; writes always require approval',
+      'Control Transformation Dashboard — update KPIs, project status, and metrics',
+      'Manage Workflow Tracker — assign tasks, update stages, track progress',
+      'Product Lifecycle management — create, update, and track products end-to-end',
+      'UAT Lifecycle control — manage test cases, update statuses, track priorities',
+      'Natural language to SQL generation with diff preview before writes',
+      'Approve or reject each operation individually with full audit trail',
     ],
-  },
-  {
-    id: 'reconciliation', name: 'Reconciliation Agent', command: '/recon',
-    icon: FileSearch, color: 'cyan',
-    colorClass: 'bg-cyan-500 shadow-cyan-500/20',
-    tagline: 'CBS vs CLM data comparison engine',
-    desc: 'Compare and reconcile data between CBS and CLM systems. Identify status mismatches, generate aggregated reports, and track reconciliation health — all read-only queries, no writes.',
-    capabilities: [
-      'Compare CBS and CLM status fields to find mismatches',
-      'Aggregated reconciliation breakdowns by status, account code, service code',
-      'Identify records that are active in one system but inactive in another',
-      'Calculate overall reconciliation health percentage',
-      'Top-N analysis: most frequent discrepancies, service codes, link codes',
-      'All queries are read-only — no data modifications',
-    ],
+    chatPath: '/agent/crud',
   },
   {
     id: 'ocr', name: 'Document Analysis Agent', command: '/doc',
@@ -61,14 +33,63 @@ const AGENTS = [
       'Structure options: one row per page or one row per line',
       'Live preview of export before download',
     ],
+    chatPath: '/agent/ocr',
   },
 ];
 
+// The two primary agents shown in the "Open Agent Chat" selector
+const PRIMARY_AGENTS = AGENTS.filter(a => a.id === 'crud' || a.id === 'ocr');
+
+function AgentSelectorModal({ onClose, navigate }) {
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-[480px] max-w-[92vw] overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900">Select an Agent</h2>
+            <p className="text-sm text-gray-500 mt-0.5">Choose which agent to chat with</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
+            <X size={18} className="text-gray-400" />
+          </button>
+        </div>
+        <div className="p-5 space-y-3">
+          {PRIMARY_AGENTS.map(a => {
+            const Icon = a.icon;
+            return (
+              <button
+                key={a.id}
+                onClick={() => { onClose(); navigate(a.chatPath); }}
+                className="w-full flex items-center gap-4 p-4 rounded-xl border border-gray-200 hover:border-gray-300 hover:shadow-md hover:-translate-y-0.5 transition-all text-left group"
+              >
+                <div className={`w-12 h-12 rounded-xl ${a.colorClass} flex items-center justify-center flex-shrink-0`}>
+                  <Icon size={24} className="text-white" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-bold text-gray-900 text-sm">{a.name}</h3>
+                  <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{a.tagline}</p>
+                </div>
+                <ArrowRight size={18} className="text-gray-300 group-hover:text-gray-500 transition-colors flex-shrink-0" />
+              </button>
+            );
+          })}
+        </div>
+        <div className="px-6 py-3 bg-gray-50 border-t border-gray-100">
+          <p className="text-xs text-gray-400 text-center">All agents are also accessible from the unified chat via <kbd className="px-1 py-0.5 bg-white rounded text-[10px] font-mono border border-gray-200">/command</kbd></p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AgentDescriptionsPage() {
   const navigate = useNavigate();
+  const [showSelector, setShowSelector] = useState(false);
 
   return (
     <div className="min-h-screen bg-[#f5f7fb] font-sans">
+      {showSelector && <AgentSelectorModal onClose={() => setShowSelector(false)} navigate={navigate} />}
+
       <div className="max-w-5xl mx-auto px-6 py-12">
         {/* Header */}
         <div className="text-center mb-12">
@@ -77,11 +98,15 @@ export default function AgentDescriptionsPage() {
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-3">AI Agents</h1>
           <p className="text-base text-gray-500 max-w-2xl mx-auto leading-relaxed">
-            Four specialized agents to help you manage data, perform CRUD operations, reconcile systems, and analyze documents. Access them all from the unified chat using <kbd className="px-1.5 py-0.5 bg-gray-100 rounded text-xs font-mono text-gray-600">/command</kbd> syntax.
+            Two specialized agents to help you control dashboards, manage workflows, and analyze documents — all through natural language.
           </p>
-          <button onClick={() => navigate('/agent')}
-            className="mt-6 inline-flex items-center gap-2 px-5 py-2.5 bg-gray-900 text-white rounded-full text-sm font-semibold hover:bg-gray-800 transition-colors shadow-sm">
-            Open Agent Chat <ArrowRight size={16} />
+          <button
+            onClick={() => setShowSelector(true)}
+            className="mt-6 inline-flex items-center gap-2 px-6 py-2.5 bg-gray-900 text-white rounded-full text-sm font-semibold hover:bg-gray-800 transition-colors shadow-sm"
+          >
+            <MessageSquare size={16} />
+            Open Agent Chat
+            <ArrowRight size={16} />
           </button>
         </div>
 
@@ -122,7 +147,7 @@ export default function AgentDescriptionsPage() {
 
                 <div className="px-8 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between">
                   <span className="text-xs text-gray-400">Type <kbd className="px-1 py-0.5 bg-white rounded text-[10px] font-mono border border-gray-200">{a.command}</kbd> in the chat to activate</span>
-                  <button onClick={() => navigate('/agent')}
+                  <button onClick={() => navigate(a.chatPath)}
                     className={`px-4 py-1.5 rounded-lg text-xs font-bold text-white ${a.colorClass.split(' ')[0]} hover:opacity-90 transition-opacity`}>
                     Try it
                   </button>

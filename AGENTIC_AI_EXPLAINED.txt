@@ -1,0 +1,1412 @@
+================================================================================
+          BSS TOOL — AGENTIC AI: COMPLETE CODE & CONCEPTS EXPLAINED
+================================================================================
+
+This document covers ALL agentic AI concepts used in the BSS Transformation
+Tool — with the actual code and detailed explanations for each concept.
+
+TABLE OF CONTENTS:
+  1.  ARCHITECTURE OVERVIEW
+  2.  CONCEPT: LLM-POWERED FUNCTION CALLING (TOOL USE)
+  3.  CONCEPT: SYSTEM PROMPTS & CONTEXT INJECTION
+  4.  CONCEPT: TOOL DEFINITIONS (OpenAI FUNCTION SCHEMAS)
+  5.  CONCEPT: TOOL DISPATCH & EXECUTION
+  6.  CONCEPT: INTENT DETECTION & ENTITY EXTRACTION
+  7.  CONCEPT: MULTI-TURN CONVERSATION (MEMORY)
+  8.  CONCEPT: HUMAN-IN-THE-LOOP (CONFIRMATION GATE)
+  9.  CONCEPT: PENDING WRITES & TTL EXPIRY
+  10. CONCEPT: DIFF PREVIEW (BEFORE/AFTER STATE)
+  11. CONCEPT: AUDIT LOGGING
+  12. CONCEPT: GUARDRAILS & SAFETY
+  13. CONCEPT: NATURAL LANGUAGE TO SQL (NL2SQL)
+  14. CONCEPT: DOCUMENT INTELLIGENCE (RAG-LITE / OCR)
+  15. CONCEPT: PROACTIVE ALERTS (AUTONOMOUS SCANNING)
+  16. CONCEPT: DATA PIPELINE AGENT (UPLOAD → SANITIZE → LOAD)
+  17. CONCEPT: CONVERSATIONAL COMMAND AGENT (FOLLOW-UP QUESTIONS)
+  18. CONCEPT: FRONTEND CHAT UI PATTERNS
+  19. FULL CODE LISTING — ALL AGENT FILES
+
+================================================================================
+1. ARCHITECTURE OVERVIEW
+================================================================================
+
+The BSS Tool has THREE distinct AI agents, each using different agentic patterns:
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         BSS AGENTIC ARCHITECTURE                            │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  AGENT 1: CRUD Operations Agent (/api/agent)                                │
+│  ├── Pattern: GPT-4o + Function Calling (4 tools)                           │
+│  ├── Tools: crud_tool, reconciliation_tool, ocr_tool, alerts_tool           │
+│  ├── Safety: Pending confirmation gate for all writes                       │
+│  ├── Files: agent_service.py, agent_tools.py, agent_endpoints.py            │
+│  └── Frontend: AgentDescriptionsPage.jsx                                    │
+│                                                                             │
+│  AGENT 2: Data Management Agent (/api/data-agent)                           │
+│  ├── Pattern: GPT-4o + Function Calling (7 tools)                           │
+│  ├── Tools: list_tables, show_schema, sanitize, upload_to_db, etc.          │
+│  ├── Safety: Pending approval for uploads & SQL execution                   │
+│  ├── Files: data_agent_service.py, data_agent_tools.py,                     │
+│  │          data_agent_endpoints.py                                         │
+│  └── Frontend: (integrated in data management page)                         │
+│                                                                             │
+│  AGENT 3: Command Agent (/api/command-agent)                                │
+│  ├── Pattern: GPT-4o + Structured JSON output (no function calling)         │
+│  ├── Approach: Intent detection → Follow-up → Confirmation → Execution      │
+│  ├── Safety: Explicit yes/no confirmation before any write                  │
+│  ├── Files: command_agent_endpoints.py                                      │
+│  └── Frontend: CommandAgentPage.jsx                                         │
+│                                                                             │
+│  SHARED INFRASTRUCTURE:                                                     │
+│  ├── Azure OpenAI (GPT-4o) — LLM backbone                                  │
+│  ├── PostgreSQL — data store                                                │
+│  ├── pending_writes table — confirmation gate                               │
+│  └── agent_audit_log table — audit trail                                    │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+
+================================================================================
+2. CONCEPT: LLM-POWERED FUNCTION CALLING (TOOL USE)
+================================================================================
+
+WHAT IT IS:
+  Function calling (tool use) is the core agentic pattern. Instead of the LLM
+  just generating text, it can choose to invoke specific functions (tools) to
+  take actions in the real world — querying databases, modifying records, etc.
+
+HOW IT WORKS:
+  1. You define tools with JSON schemas (name, description, parameters)
+  2. You send the user message + tool definitions to the LLM
+  3. The LLM decides WHETHER to call a tool and WHICH one
+  4. The LLM returns a structured tool_call with function name + arguments
+  5. Your code executes the tool and returns the result
+  6. The LLM generates a natural language response incorporating the tool result
+
+FLOW:
+  User message → GPT-4o (with tools) → tool_call decision
+       → Execute tool → Tool result → GPT-4o → Natural language reply
+
+CODE (from agent_service.py):
+─────────────────────────────────────────────────────────────────────────────
+  # Step 1: Call GPT-4o with tool definitions
+  response = client.chat.completions.create(
+      model=MODEL,
+      messages=messages,
+      tools=TOOL_DEFINITIONS,      # <-- tool schemas
+      tool_choice="auto",          # <-- LLM decides when to use tools
+      max_tokens=2048,
+      temperature=0,               # <-- deterministic for reliability
+  )
+
+  # Step 2: Check if GPT chose to call a tool
+  choice = response.choices[0]
+  if choice.finish_reason == 'tool_calls' or choice.message.tool_calls:
+      tool_calls = choice.message.tool_calls
+
+      for tc in tool_calls:
+          fn_name = tc.function.name          # e.g., "crud_tool"
+          args = json.loads(tc.function.arguments)  # e.g., {"table": "uat_cases", ...}
+
+          # Step 3: Execute the tool
+          dispatch_fn = TOOL_DISPATCH.get(fn_name)
+          result = dispatch_fn(args)
+
+          # Step 4: Send tool result back to GPT
+          messages.append({
+              "role": "tool",
+              "tool_call_id": tc.id,
+              "content": json.dumps(result, default=str),
+          })
+
+      # Step 5: Get final natural language response
+      final_response = client.chat.completions.create(
+          model=MODEL,
+          messages=messages,
+          max_tokens=1024,
+          temperature=0,
+      )
+      reply = final_response.choices[0].message.content
+─────────────────────────────────────────────────────────────────────────────
+
+KEY INSIGHT:
+  The LLM acts as a "reasoning engine" that decides WHAT to do, while your
+  code provides the actual CAPABILITIES. This is the fundamental agentic
+  pattern — the LLM orchestrates, the tools execute.
+
+
+================================================================================
+3. CONCEPT: SYSTEM PROMPTS & CONTEXT INJECTION
+================================================================================
+
+WHAT IT IS:
+  System prompts define the agent's persona, capabilities, rules, and context.
+  Context injection means dynamically inserting real-time data (today's date,
+  current database state, user's page context) into the system prompt.
+
+WHY IT MATTERS:
+  The system prompt is the "brain" of the agent. It determines what the agent
+  knows, how it behaves, and what guardrails it follows.
+
+CODE (from agent_tools.py — CRUD Agent):
+─────────────────────────────────────────────────────────────────────────────
+  SCHEMA_CONTEXT = """You are an AI agent for the BSS Migration Assurance
+  Tool (KPMG). You help users manage BSS migration data across these
+  PostgreSQL tables:
+
+  TABLES:
+  1. uat_cases (test_case_id TEXT PK, lob TEXT, priority TEXT, status TEXT, ...)
+  2. products (product_id TEXT PK, product_name TEXT, lob TEXT, ...)
+  3. transformation_activities (id SERIAL PK, lob TEXT, phase_name TEXT, ...)
+  ... (11 tables total with full schema)
+
+  RULES:
+  - NEVER write to agent_audit_log or pending_writes tables
+  - NEVER use DELETE FROM — only soft deletes via deleted_at = NOW()
+  - No DB write executes without showing a diff first
+  - Today's date: {today}              # <-- injected dynamically
+  - Current page context: {page}       # <-- injected dynamically
+  - For READ operations, execute immediately and show results
+  - For any WRITE operation, always use the crud_tool
+  """
+
+  # Dynamic injection at runtime:
+  system_prompt = SCHEMA_CONTEXT.format(
+      today=datetime.date.today().isoformat(),
+      page=current_page,
+  )
+─────────────────────────────────────────────────────────────────────────────
+
+CODE (from command_agent_endpoints.py — context builder):
+─────────────────────────────────────────────────────────────────────────────
+  def _build_context():
+      """Build a summary of current data for GPT context."""
+      parts = []
+
+      # Inject current projects
+      projects = _query("SELECT code, name, status FROM projects ...")
+      if projects:
+          lines = [f"  - {p['code']}: {p['name']} ({p['status']})" for p in projects]
+          parts.append("CURRENT PROJECTS:\n" + "\n".join(lines))
+
+      # Inject current users
+      users = _query("SELECT username, full_name, role FROM users ...")
+      if users:
+          lines = [f"  - {u['username']}: {u['full_name']} ({u['role']})" for u in users]
+          parts.append("AVAILABLE USERS:\n" + "\n".join(lines))
+
+      # Inject current phases
+      phases = _query("SELECT DISTINCT phase_id, curr_status FROM phases ...")
+      if phases:
+          lines = [f"  - {p['phase_id']}: {p['curr_status']}" for p in phases]
+          parts.append("WORKFLOW PHASES:\n" + "\n".join(lines))
+
+      return "\n\n".join(parts)
+
+  # This context is appended to the system prompt at runtime:
+  system = SYSTEM_PROMPT.replace("__TODAY__", today) + "\n\n" + context
+─────────────────────────────────────────────────────────────────────────────
+
+KEY INSIGHT:
+  Context injection is a form of RAG (Retrieval-Augmented Generation). By
+  feeding real-time DB state into the system prompt, the agent can reference
+  actual project names, user names, and phase statuses — making it accurate
+  without hallucinating entity names.
+
+
+================================================================================
+4. CONCEPT: TOOL DEFINITIONS (OpenAI FUNCTION SCHEMAS)
+================================================================================
+
+WHAT IT IS:
+  Tool definitions are JSON schemas that describe each function the LLM can
+  call. They include the function name, a description of what it does, and
+  the exact parameter schema (types, enums, required fields).
+
+WHY IT MATTERS:
+  The quality of your tool definitions directly determines how well the LLM
+  picks the right tool and extracts the right arguments. Good descriptions
+  and constrained enums = fewer errors.
+
+CODE (from agent_tools.py — CRUD Agent tools):
+─────────────────────────────────────────────────────────────────────────────
+  TOOL_DEFINITIONS = [
+      {
+          "type": "function",
+          "function": {
+              "name": "crud_tool",
+              "description": "Perform CREATE, READ, UPDATE, DELETE, or
+                  BULK_UPDATE operations on database tables. For DELETE,
+                  only soft deletes (setting deleted_at) are allowed.",
+              "parameters": {
+                  "type": "object",
+                  "properties": {
+                      "table": {
+                          "type": "string",
+                          "description": "The database table to operate on",
+                          "enum": list(ALLOWED_TABLES),  # <-- constrained!
+                      },
+                      "operation": {
+                          "type": "string",
+                          "enum": ["CREATE", "READ", "UPDATE", "DELETE",
+                                   "BULK_UPDATE"],
+                      },
+                      "filters": {
+                          "type": "object",
+                          "description": "WHERE clause conditions as
+                              key-value pairs",
+                      },
+                      "data": {
+                          "type": "object",
+                          "description": "The data to write (for CREATE,
+                              UPDATE, BULK_UPDATE)",
+                      },
+                  },
+                  "required": ["table", "operation"],
+              },
+          },
+      },
+      {
+          "type": "function",
+          "function": {
+              "name": "reconciliation_tool",
+              "description": "Answer natural language questions about
+                  reconciliation data by dynamically generating and
+                  executing safe SQL queries.",
+              "parameters": {
+                  "type": "object",
+                  "properties": {
+                      "question": {
+                          "type": "string",
+                          "description": "A natural language question about
+                              reconciliation data",
+                      },
+                  },
+                  "required": ["question"],
+              },
+          },
+      },
+      {
+          "type": "function",
+          "function": {
+              "name": "ocr_tool",
+              "description": "Extract text from PDF files and answer
+                  questions about them. Use for document analysis,
+                  invoice matching, discrepancy detection.",
+              "parameters": {
+                  "type": "object",
+                  "properties": {
+                      "file_paths": {
+                          "type": "array",
+                          "items": {"type": "string"},
+                      },
+                      "question": {
+                          "type": "string",
+                      },
+                  },
+                  "required": ["file_paths", "question"],
+              },
+          },
+      },
+      {
+          "type": "function",
+          "function": {
+              "name": "alerts_tool",
+              "description": "Scan all database tables and return risk
+                  alerts. Checks: UAT completion <50%, overdue phases,
+                  unconfigured products flagged for migration. No parameters
+                  needed.",
+              "parameters": {"type": "object", "properties": {}},
+          },
+      },
+  ]
+─────────────────────────────────────────────────────────────────────────────
+
+CODE (from data_agent_tools.py — Data Agent tools):
+─────────────────────────────────────────────────────────────────────────────
+  DATA_TOOL_DEFINITIONS = [
+      {"type": "function", "function": {
+          "name": "list_tables",
+          "description": "List all tables in the PostgreSQL database with
+              their schemas",
+          "parameters": {"type": "object", "properties": {}, "required": []},
+      }},
+      {"type": "function", "function": {
+          "name": "preview_file",
+          "description": "Preview an uploaded file — shows headers, sample
+              rows, row count, file size, estimated upload time.",
+          "parameters": {...},
+      }},
+      {"type": "function", "function": {
+          "name": "sanitize_file",
+          "description": "Clean/sanitize an uploaded file: trim whitespace,
+              remove empty rows, deduplicate, standardize column names.",
+          "parameters": {...},
+      }},
+      {"type": "function", "function": {
+          "name": "upload_to_db",
+          "description": "Upload file data into a PostgreSQL table. Creates
+              table if not exists. Returns SQL for user approval.",
+          "parameters": {...},
+      }},
+      {"type": "function", "function": {
+          "name": "compare_datasets",
+          "description": "Generate SQL to compare/analyze datasets.
+              Uses GROUP BY to keep results small. SQL shown for approval.",
+          "parameters": {...},
+      }},
+  ]
+─────────────────────────────────────────────────────────────────────────────
+
+
+================================================================================
+5. CONCEPT: TOOL DISPATCH & EXECUTION
+================================================================================
+
+WHAT IT IS:
+  Tool dispatch maps the tool name returned by the LLM to the actual Python
+  function that executes the action. It's the bridge between the LLM's
+  decision and real-world execution.
+
+CODE (from agent_tools.py):
+─────────────────────────────────────────────────────────────────────────────
+  # Map tool names to functions
+  TOOL_DISPATCH = {
+      'crud_tool': lambda args: crud_tool(
+          table=args.get('table', ''),
+          operation=args.get('operation', 'READ'),
+          filters=args.get('filters'),
+          data=args.get('data'),
+      ),
+      'reconciliation_tool': lambda args: reconciliation_tool(
+          question=args.get('question', ''),
+      ),
+      'ocr_tool': lambda args: ocr_tool(
+          file_paths=args.get('file_paths', []),
+          question=args.get('question', ''),
+      ),
+      'alerts_tool': lambda args: alerts_tool(),
+  }
+
+  # Usage in agent_service.py:
+  dispatch_fn = TOOL_DISPATCH.get(fn_name)
+  if dispatch_fn:
+      result = dispatch_fn(args)
+─────────────────────────────────────────────────────────────────────────────
+
+
+================================================================================
+6. CONCEPT: INTENT DETECTION & ENTITY EXTRACTION
+================================================================================
+
+WHAT IT IS:
+  Instead of using function calling, the Command Agent uses GPT-4o to detect
+  the user's INTENT (create, update, list, assign, delete) and extract
+  ENTITIES (project name, assignee, dates) from natural language — returning
+  structured JSON.
+
+WHY USE THIS PATTERN:
+  This pattern is useful when you want the LLM to handle the entire decision
+  flow (ask follow-up questions, confirm, then execute) rather than just
+  picking a tool. It gives more control over the conversation flow.
+
+CODE (from command_agent_endpoints.py):
+─────────────────────────────────────────────────────────────────────────────
+  # The LLM is instructed to return structured JSON:
+  response_format={"type": "json_object"}
+
+  # Expected output format:
+  {
+    "type": "question" | "confirmation" | "result" | "info",
+    "message": "Human-readable message to show the user",
+    "action": {
+        "intent": "create_project" | "update_task" | "assign_task" | ...,
+        "params": {
+            "name": "Migration Phase 2",
+            "owner": "priya_sharma",
+            "start_date": "2026-08-01",
+        }
+    },
+    "missing_fields": ["end_date"] | null,
+    "awaiting_confirmation": true | false
+  }
+
+  # Example conversation flow:
+  # User: "Create a new project"
+  # Agent: {"type": "question", "message": "What should the project be
+  #         called?", "missing_fields": ["name"]}
+  # User: "Migration Phase 2"
+  # Agent: {"type": "question", "message": "Who should own it?",
+  #         "missing_fields": ["owner"]}
+  # User: "Priya Sharma"
+  # Agent: {"type": "confirmation", "message": "I'll create project
+  #         'Migration Phase 2' owned by Priya Sharma. Proceed?",
+  #         "action": {...}, "awaiting_confirmation": true}
+  # User: "yes"
+  # Agent: {"type": "result", "message": "Project created with code
+  #         PRJ-0005"}
+─────────────────────────────────────────────────────────────────────────────
+
+ENTITY RESOLUTION (fuzzy matching):
+─────────────────────────────────────────────────────────────────────────────
+  def _resolve_user(name_or_username):
+      """Find a user by username or partial full_name match."""
+      # Try exact username match first
+      row = _query("SELECT * FROM users WHERE username=%s",
+                   (name_or_username,), fetch='one')
+      if row:
+          return row
+      # Fall back to fuzzy name match
+      row = _query(
+          "SELECT * FROM users WHERE LOWER(full_name) LIKE %s LIMIT 1",
+          (f"%{name_or_username.lower()}%",), fetch='one')
+      return row
+
+  def _resolve_project(ref):
+      """Find a project by code, id, or partial name match."""
+      # Try code (e.g., "PRJ-0001")
+      row = _query("SELECT * FROM projects WHERE code=%s",
+                   (str(ref).upper(),), fetch='one')
+      if row: return row
+      # Try numeric id
+      try:
+          row = _query("SELECT * FROM projects WHERE id=%s",
+                       (int(ref),), fetch='one')
+          if row: return row
+      except (ValueError, TypeError): pass
+      # Fall back to partial name match
+      row = _query(
+          "SELECT * FROM projects WHERE LOWER(name) LIKE %s LIMIT 1",
+          (f"%{str(ref).lower()}%",), fetch='one')
+      return row
+─────────────────────────────────────────────────────────────────────────────
+
+
+================================================================================
+7. CONCEPT: MULTI-TURN CONVERSATION (MEMORY)
+================================================================================
+
+WHAT IT IS:
+  Multi-turn conversation means the agent maintains context across multiple
+  messages in a session. The conversation history is sent with each request
+  so the LLM understands prior context.
+
+HOW IT WORKS:
+  The frontend maintains a history array. Each new message appends to it.
+  The entire history is sent to the backend, which passes it to GPT-4o.
+
+CODE (Backend — command_agent_endpoints.py):
+─────────────────────────────────────────────────────────────────────────────
+  # Build messages for GPT from conversation history
+  messages = [{"role": "system", "content": system}]
+
+  # Include last 20 messages of history (sliding window)
+  for h in history[-20:]:
+      messages.append({
+          "role": h.get("role", "user"),
+          "content": h.get("content", "")
+      })
+
+  # Add the new user message
+  messages.append({"role": "user", "content": message})
+─────────────────────────────────────────────────────────────────────────────
+
+CODE (Frontend — CommandAgentPage.jsx):
+─────────────────────────────────────────────────────────────────────────────
+  const [history, setHistory] = useState([]);
+
+  const send = async (text) => {
+      const msg = (text || input).trim();
+
+      // Add user message to history
+      const newHistory = [...history, { role: 'user', content: msg }];
+      setHistory(newHistory);
+
+      const res = await fetch('/api/command-agent/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+              message: msg,
+              history: newHistory,        // <-- full history sent
+              pending_action: pendingAction,
+          }),
+      });
+      const data = await res.json();
+
+      // Add agent response to history
+      setHistory(prev => [
+          ...prev,
+          { role: 'assistant', content: data.message }
+      ]);
+  };
+─────────────────────────────────────────────────────────────────────────────
+
+KEY INSIGHT:
+  This is "stateless" multi-turn — the server doesn't store sessions. The
+  client sends the full history each time. This is simpler but means the
+  context window limits how much history you can include (hence the [-20:]
+  sliding window).
+
+
+================================================================================
+8. CONCEPT: HUMAN-IN-THE-LOOP (CONFIRMATION GATE)
+================================================================================
+
+WHAT IT IS:
+  The most critical safety pattern in agentic AI. EVERY write operation
+  (CREATE, UPDATE, DELETE) requires explicit human confirmation before
+  execution. The agent shows WHAT it will do and asks for approval.
+
+WHY IT MATTERS:
+  Without this, a misunderstood prompt could delete records or corrupt data.
+  The confirmation gate is the "seatbelt" of agentic systems.
+
+CODE (CRUD Agent — agent_service.py):
+─────────────────────────────────────────────────────────────────────────────
+  WRITE_OPERATIONS = {'CREATE', 'UPDATE', 'DELETE', 'BULK_UPDATE'}
+
+  # In the chat method:
+  is_write = (
+      fn_name == 'crud_tool'
+      and args.get('operation', 'READ').upper() in WRITE_OPERATIONS
+  )
+
+  if is_write:
+      # DON'T execute — store as pending write
+      pending = self._create_pending_write(fn_name, args, current_page)
+      pending_confirmation = pending
+      tool_result = json.dumps({
+          'status': 'pending_confirmation',
+          'pending_id': pending['pending_id'],
+          'description': pending['description'],
+          'message': 'This write requires user confirmation.',
+      })
+  else:
+      # READ operations execute immediately
+      result = dispatch_fn(args)
+─────────────────────────────────────────────────────────────────────────────
+
+CODE (Command Agent — command_agent_endpoints.py):
+─────────────────────────────────────────────────────────────────────────────
+  # User confirms a pending action
+  if pending_action and message.lower() in ('yes', 'y', 'proceed',
+      'go ahead', 'confirm', 'do it', 'ok', 'sure'):
+      result = _execute_action(pending_action)
+      return jsonify({
+          'type': 'result',
+          'message': result.get('message') if result.get('success')
+                     else f"Failed: {result.get('error')}",
+          'success': result.get('success', False),
+      })
+
+  # User cancels
+  if pending_action and message.lower() in ('no', 'n', 'cancel', 'abort'):
+      return jsonify({
+          'type': 'info',
+          'message': 'Cancelled. No changes were made.',
+      })
+─────────────────────────────────────────────────────────────────────────────
+
+CODE (Frontend — confirmation buttons):
+─────────────────────────────────────────────────────────────────────────────
+  {m.awaitingConfirmation && i === messages.length - 1 && pendingAction && (
+    <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+      <button onClick={handleConfirm} style={{
+        background: '#16a34a', color: '#fff', ...
+      }}>Yes, proceed</button>
+
+      <button onClick={handleCancel} style={{
+        background: '#fff', color: '#dc2626', border: '1px solid #dc2626',...
+      }}>Cancel</button>
+    </div>
+  )}
+─────────────────────────────────────────────────────────────────────────────
+
+
+================================================================================
+9. CONCEPT: PENDING WRITES & TTL EXPIRY
+================================================================================
+
+WHAT IT IS:
+  When a write operation is requested, it's stored in a "pending_writes"
+  database table with a 10-minute TTL (time-to-live). If the user doesn't
+  confirm within 10 minutes, the pending write automatically expires.
+
+WHY IT MATTERS:
+  Prevents stale operations from being accidentally confirmed later when
+  the data state may have changed.
+
+CODE (from agent_service.py):
+─────────────────────────────────────────────────────────────────────────────
+  def _create_pending_write(self, tool_name, args, page_context):
+      pending_id = str(uuid.uuid4())
+
+      # Store in pending_writes table (has expires_at column with default
+      # NOW() + INTERVAL '10 minutes')
+      _query(
+          """INSERT INTO pending_writes
+             (id, tool_name, sql_to_execute, params_json, diff_json,
+              description, status)
+             VALUES (%s, %s, %s, %s, %s, %s, 'pending')""",
+          (pending_id, tool_name, sql_preview,
+           json.dumps(args), json.dumps(diff), description),
+          fetch=None,
+      )
+      return {
+          'pending_id': pending_id,
+          'description': description,
+          'diff': diff,
+          'sql_preview': sql_preview,
+      }
+
+  def execute_confirmed_write(self, pending_id):
+      row = _query("SELECT * FROM pending_writes WHERE id = %s",
+                   (pending_id,), fetch='one')
+
+      if row['status'] != 'pending':
+          return {'error': f"Write already {row['status']}"}
+
+      # Check TTL expiry
+      if row['expires_at'] and row['expires_at'] < datetime.datetime.now():
+          _query("UPDATE pending_writes SET status = 'expired' WHERE id=%s",
+                 (pending_id,), fetch=None)
+          return {'error': 'Pending write has expired (10 min TTL)'}
+
+      # Execute the actual write
+      result = dispatch_fn(args)
+
+      # Mark as executed
+      _query("UPDATE pending_writes SET status = 'executed' WHERE id=%s",
+             (pending_id,), fetch=None)
+
+      return {'success': True, 'rows_affected': result.get('rows_affected')}
+─────────────────────────────────────────────────────────────────────────────
+
+PENDING WRITE LIFECYCLE:
+  pending → confirmed → executed (success)
+  pending → confirmed → failed (error)
+  pending → rejected (user said no)
+  pending → expired (10 min TTL passed)
+
+
+================================================================================
+10. CONCEPT: DIFF PREVIEW (BEFORE/AFTER STATE)
+================================================================================
+
+WHAT IT IS:
+  Before executing any write, the agent captures the CURRENT state of the
+  affected rows (BEFORE), simulates what the state WILL BE after the write
+  (AFTER), and shows this diff to the user for review.
+
+WHY IT MATTERS:
+  Users can see exactly what will change before approving. This prevents
+  mistakes and builds trust in the agent.
+
+CODE (from agent_service.py):
+─────────────────────────────────────────────────────────────────────────────
+  def _create_pending_write(self, tool_name, args, page_context):
+      table = args.get('table', '')
+      operation = args.get('operation', '').upper()
+      filters = args.get('filters', {})
+      data = args.get('data', {})
+
+      # STEP 1: Capture BEFORE state (current DB rows)
+      before = []
+      if filters and operation in ('UPDATE', 'DELETE', 'BULK_UPDATE'):
+          where_parts = []
+          where_params = []
+          for k, v in filters.items():
+              where_parts.append(f"{k} = %s")
+              where_params.append(v)
+          where_clause = ' WHERE ' + ' AND '.join(where_parts)
+          rows = _query(f"SELECT * FROM {table}{where_clause}", where_params)
+          before = _rows_to_dicts(rows)
+
+      # STEP 2: Simulate AFTER state (don't actually write)
+      after = []
+      if operation == 'CREATE':
+          after = [data]
+      elif operation in ('UPDATE', 'BULK_UPDATE'):
+          for row in before:
+              updated = dict(row)
+              updated.update(data)    # Apply the changes
+              after.append(updated)
+      elif operation == 'DELETE':
+          for row in before:
+              updated = dict(row)
+              updated['deleted_at'] = datetime.datetime.now().isoformat()
+              after.append(updated)
+
+      # STEP 3: Build SQL preview (human-readable, not for execution)
+      sql_preview = self._build_sql_preview(table, operation, filters, data)
+
+      diff = {
+          'before': before,
+          'after': after,
+          'table': table,
+          'operation': operation,
+          'rows_affected': len(before) if before else 1,
+      }
+      return diff
+─────────────────────────────────────────────────────────────────────────────
+
+
+================================================================================
+11. CONCEPT: AUDIT LOGGING
+================================================================================
+
+WHAT IT IS:
+  Every confirmed agent action is logged to an agent_audit_log table with:
+  who did it, what prompt triggered it, which tool was called, the SQL
+  executed, how many rows were affected, and the before/after diff.
+
+WHY IT MATTERS:
+  Full accountability and traceability. You can always answer "what did the
+  agent do and why?"
+
+CODE (from agent_service.py):
+─────────────────────────────────────────────────────────────────────────────
+  # After successful execution:
+  _query(
+      """INSERT INTO agent_audit_log
+         (user_id, prompt, tool_called, sql_executed, rows_affected,
+          diff_json, page_context)
+         VALUES (%s, %s, %s, %s, %s, %s, %s)""",
+      (
+          'Programme User',            # who
+          row['description'],          # what was requested
+          row['tool_name'],            # which tool ran
+          result.get('sql', ''),       # exact SQL executed
+          result.get('rows_affected'), # impact
+          json.dumps({                 # full diff
+              'before': diff[0],
+              'after': diff[1]
+          }, default=str),
+          'agent',                     # page context
+      ),
+      fetch=None,
+  )
+─────────────────────────────────────────────────────────────────────────────
+
+ENDPOINT (from agent_endpoints.py):
+─────────────────────────────────────────────────────────────────────────────
+  @agent_bp.route('/audit-log', methods=['GET'])
+  def agent_audit_log():
+      rows = _query(
+          "SELECT * FROM agent_audit_log ORDER BY timestamp DESC LIMIT 50"
+      )
+      return jsonify(result)
+─────────────────────────────────────────────────────────────────────────────
+
+
+================================================================================
+12. CONCEPT: GUARDRAILS & SAFETY
+================================================================================
+
+WHAT IT IS:
+  Multiple layers of protection to prevent the agent from doing harmful things:
+
+  1. PROTECTED TABLES — agent can never write to audit or pending tables
+  2. ALLOWED TABLES — whitelist of tables the agent CAN touch
+  3. SOFT DELETE ONLY — no hard deletes, only sets deleted_at
+  4. WRITE CONFIRMATION — all writes require human approval
+  5. TTL EXPIRY — pending writes expire after 10 minutes
+  6. SQL INJECTION PREVENTION — parameterized queries
+  7. SELECT-ONLY for reconciliation — NL2SQL only generates SELECT queries
+
+CODE (from agent_tools.py):
+─────────────────────────────────────────────────────────────────────────────
+  # Layer 1: Protected tables (absolute block)
+  PROTECTED_TABLES = {'agent_audit_log', 'pending_writes'}
+
+  # Layer 2: Allowed tables (whitelist)
+  ALLOWED_TABLES = {
+      'uat_cases', 'products', 'product_parameters',
+      'transformation_activities', 'transformation_lob_progress',
+      'phases', 'checklist', 'checklist_comments',
+      'checklist_attachments', 'reconciliation_data', 'kpi_results',
+      'users',
+  }
+
+  # Layer 3: Enforcement in crud_tool
+  def crud_tool(table, operation, filters=None, data=None):
+      if table in PROTECTED_TABLES:
+          return {'error': f'Writes to {table} are not permitted.'}
+      if table not in ALLOWED_TABLES:
+          return {'error': f'Unknown table: {table}'}
+
+  # Layer 4: Soft delete only (no DELETE FROM)
+  def _crud_soft_delete(table, filters):
+      if not filters:
+          return {'error': 'DELETE requires filters to avoid deleting
+                  all rows'}
+      sql = f"UPDATE {table} SET deleted_at = NOW(){where}"  # soft delete!
+
+  # Layer 5: Parameterized queries (no SQL injection)
+  def _build_where(filters):
+      parts = []
+      params = []
+      for k, v in filters.items():
+          parts.append(f"{k} = %s")     # parameterized
+          params.append(v)              # values passed separately
+      return ' WHERE ' + ' AND '.join(parts), params
+
+  # Layer 6: SELECT-only guard for reconciliation
+  def reconciliation_tool(question):
+      ...
+      if not sql.strip().upper().startswith('SELECT'):
+          return {'error': 'Only SELECT queries are allowed.'}
+─────────────────────────────────────────────────────────────────────────────
+
+
+================================================================================
+13. CONCEPT: NATURAL LANGUAGE TO SQL (NL2SQL)
+================================================================================
+
+WHAT IT IS:
+  The reconciliation tool takes a natural language question, uses GPT-4o to
+  generate a safe SQL query, executes it, and returns the results. This is
+  a two-step LLM call pattern: one to generate SQL, one to explain results.
+
+CODE (from agent_tools.py):
+─────────────────────────────────────────────────────────────────────────────
+  def reconciliation_tool(question):
+      schema_hint = """Table: reconciliation_data
+      Columns: id, account_link_code, service_code, service_name,
+               cbs_status, clm_status, status, uploaded_at
+      Only generate SELECT queries. Never UPDATE/DELETE/DROP."""
+
+      # Step 1: Generate SQL from natural language
+      gen_response = client.chat.completions.create(
+          model=MODEL,
+          response_format={"type": "json_object"},
+          messages=[
+              {"role": "system", "content": f"You are a SQL expert.
+                  Given a question about reconciliation data, generate
+                  a safe PostgreSQL SELECT query.\n\n{schema_hint}\n\n
+                  Return JSON: {{\"sql\": \"...\", \"explanation\": \"...\"}}"},
+              {"role": "user", "content": question},
+          ],
+          max_tokens=512,
+          temperature=0,
+      )
+      parsed = json.loads(gen_response.choices[0].message.content)
+      sql = parsed.get('sql', '')
+
+      # Safety guard: only allow SELECT
+      if not sql.strip().upper().startswith('SELECT'):
+          return {'error': 'Only SELECT queries are allowed.'}
+
+      # Step 2: Execute the generated SQL
+      rows = _query(sql)
+      return {
+          'rows': _rows_to_dicts(rows),
+          'count': len(rows),
+          'sql': sql,
+          'explanation': parsed.get('explanation', ''),
+      }
+─────────────────────────────────────────────────────────────────────────────
+
+SIMILAR PATTERN in Data Agent (compare_datasets):
+─────────────────────────────────────────────────────────────────────────────
+  def compare_tool(args):
+      # Fetch table schemas for context
+      schema_info = []
+      for tbl in [table1, table2]:
+          cols = _query("""SELECT column_name, data_type
+              FROM information_schema.columns
+              WHERE table_name = %s""", (tbl,))
+          schema_info.append({'table': tbl, 'columns': [dict(c) for c in cols]})
+
+      # Ask GPT-4o to generate comparison SQL
+      sql_response = client.chat.completions.create(
+          model=MODEL,
+          messages=[
+              {"role": "system", "content": f"""You are a PostgreSQL expert.
+                  Available schema: {json.dumps(schema_info)}
+                  Use GROUP BY for aggregations. LIMIT 100 rows max."""},
+              {"role": "user", "content": user_logic},
+          ],
+      )
+      generated_sql = sql_response.choices[0].message.content
+
+      return {
+          'sql': generated_sql,
+          'requires_approval': True,  # <-- needs human approval!
+      }
+─────────────────────────────────────────────────────────────────────────────
+
+
+================================================================================
+14. CONCEPT: DOCUMENT INTELLIGENCE (RAG-LITE / OCR)
+================================================================================
+
+WHAT IT IS:
+  The OCR tool extracts text from PDFs using PyMuPDF, concatenates all the
+  text, and sends it to GPT-4o with the user's question. This is a simplified
+  RAG (Retrieval-Augmented Generation) pattern — the "retrieval" is text
+  extraction, and the "generation" is GPT-4o answering based on the content.
+
+CODE (from agent_tools.py):
+─────────────────────────────────────────────────────────────────────────────
+  def ocr_tool(file_paths, question):
+      all_texts = []
+
+      # Step 1: Extract text from each PDF
+      for fp in file_paths:
+          if not os.path.isfile(fp):
+              all_texts.append(f"[File not found: {fp}]")
+              continue
+          doc = fitz.open(fp)      # PyMuPDF
+          text = ""
+          for page in doc:
+              text += page.get_text()
+          doc.close()
+          all_texts.append(f"=== {os.path.basename(fp)} ===\n{text}")
+
+      combined = "\n\n".join(all_texts)
+
+      # Step 2: Ask GPT-4o to analyze the extracted text
+      response = client.chat.completions.create(
+          model=MODEL,
+          messages=[
+              {"role": "system", "content": "You are a document analysis
+                  expert. Analyse the extracted PDF text(s) and answer the
+                  user's question. Flag discrepancies clearly.
+                  Return JSON: {\"answer\": \"...\",
+                  \"flagged_items\": [...]}"},
+              {"role": "user", "content":
+                  f"Documents:\n{combined}\n\nQuestion: {question}"},
+          ],
+          response_format={"type": "json_object"},
+          max_tokens=2048,
+          temperature=0,
+      )
+      return json.loads(response.choices[0].message.content)
+─────────────────────────────────────────────────────────────────────────────
+
+KEY INSIGHT:
+  This is "RAG-lite" because the full document text is stuffed into the
+  prompt context (no vector database or embeddings). This works well for
+  documents that fit within the context window (~128K tokens for GPT-4o).
+
+
+================================================================================
+15. CONCEPT: PROACTIVE ALERTS (AUTONOMOUS SCANNING)
+================================================================================
+
+WHAT IT IS:
+  The alerts_tool runs autonomously without any user prompt. It scans ALL
+  database tables looking for risk conditions and returns alerts. The LLM
+  can call this tool proactively, or the frontend can poll the /alerts
+  endpoint.
+
+ALERT RULES:
+  1. UAT completion below 50% for any LOB
+  2. Phases past their end date but still "current"
+  3. Products flagged for migration but not yet configured
+  4. Transformation activities where actual is >20 points behind planned
+
+CODE (from agent_tools.py):
+─────────────────────────────────────────────────────────────────────────────
+  def alerts_tool():
+      alerts = []
+      today = datetime.date.today().isoformat()
+
+      # Alert 1: UAT completion below 50%
+      uat_rows = _query("""
+          SELECT lob,
+              COUNT(*) as total,
+              SUM(CASE WHEN status = 'CLOSED' THEN 1 ELSE 0 END) as closed
+          FROM uat_cases
+          GROUP BY lob
+      """)
+      for r in (uat_rows or []):
+          if r['total'] > 0 and (r['closed'] / r['total']) < 0.5:
+              pct = round(r['closed'] / r['total'] * 100)
+              alerts.append({
+                  'severity': 'high',
+                  'module': 'UAT',
+                  'description': f"UAT completion for {r['lob']} is only
+                      {pct}% ({r['closed']}/{r['total']} cases closed)",
+              })
+
+      # Alert 2: Overdue phases
+      phase_rows = _query("""
+          SELECT phase_id, end_dt, curr_status FROM phases
+          WHERE curr_status = 'current' AND end_dt IS NOT NULL
+      """)
+      for r in (phase_rows or []):
+          if r['end_dt'] and r['end_dt'] < today:
+              alerts.append({
+                  'severity': 'high',
+                  'module': 'Milestones',
+                  'description': f"Phase {r['phase_id']} is past its
+                      end date ({r['end_dt']}) but still in progress",
+              })
+
+      # Alert 3: Unconfigured products flagged for migration
+      prod_rows = _query("""
+          SELECT product_id, product_name, status FROM products
+          WHERE migration_flag = 'migrate' AND status != 'configured'
+              AND deleted_at IS NULL
+      """)
+      for r in (prod_rows or []):
+          alerts.append({
+              'severity': 'medium',
+              'module': 'Products',
+              'description': f"Product {r['product_name']}
+                  ({r['product_id']}) flagged for migration but
+                  status is '{r['status']}'",
+          })
+
+      # Alert 4: Transformation behind schedule
+      ta_rows = _query("""
+          SELECT lob, phase_name, planned, actual
+          FROM transformation_activities
+          WHERE planned > 0 AND (planned - actual) > 20
+      """)
+      for r in (ta_rows or []):
+          gap = r['planned'] - r['actual']
+          alerts.append({
+              'severity': 'high' if gap > 40 else 'medium',
+              'module': 'Transformation',
+              'description': f"{r['lob']} — {r['phase_name']}: actual
+                  ({r['actual']}%) is {gap} points behind planned
+                  ({r['planned']}%)",
+          })
+
+      return {'alerts': alerts, 'count': len(alerts)}
+─────────────────────────────────────────────────────────────────────────────
+
+
+================================================================================
+16. CONCEPT: DATA PIPELINE AGENT (UPLOAD → SANITIZE → LOAD)
+================================================================================
+
+WHAT IT IS:
+  The Data Management Agent implements a complete ETL (Extract-Transform-Load)
+  pipeline via natural language:
+    1. UPLOAD: User uploads CSV/PSV file
+    2. PREVIEW: Agent shows file metadata (headers, sample rows, size)
+    3. SANITIZE: Agent cleans data (trim, dedupe, standardize columns)
+    4. LOAD: Agent uploads clean data to PostgreSQL (with type inference)
+    5. COMPARE: Agent generates SQL for cross-table analysis
+
+TYPE INFERENCE (from data_agent_tools.py):
+─────────────────────────────────────────────────────────────────────────────
+  def _infer_pg_types(df):
+      """Map pandas dtypes to PostgreSQL types."""
+      type_map = {}
+      for col in df.columns:
+          sample = df[col].dropna()
+
+          # Try integer
+          try:
+              sample.astype(int)
+              type_map[col] = 'INTEGER'
+              continue
+          except: pass
+
+          # Try float
+          try:
+              sample.astype(float)
+              type_map[col] = 'NUMERIC'
+              continue
+          except: pass
+
+          # Try date
+          try:
+              pd.to_datetime(sample, format='mixed')
+              type_map[col] = 'TIMESTAMP'
+              continue
+          except: pass
+
+          # Default to TEXT
+          type_map[col] = 'TEXT'
+
+      return type_map
+─────────────────────────────────────────────────────────────────────────────
+
+SANITIZATION (from data_agent_tools.py):
+─────────────────────────────────────────────────────────────────────────────
+  def sanitize_file_tool(args):
+      df = pd.read_csv(info['file_path'], sep=info['delimiter'], dtype=str)
+      rows_before = len(df)
+      changes = []
+
+      # 1. Trim whitespace from all text columns
+      if rules.get('trim_whitespace', True):
+          df = df.apply(
+              lambda col: col.str.strip() if col.dtype == 'object' else col
+          )
+          changes.append('Trimmed whitespace')
+
+      # 2. Replace empty strings with NaN
+      df.replace('', pd.NA, inplace=True)
+
+      # 3. Drop completely empty rows
+      if rules.get('drop_all_null', True):
+          before = len(df)
+          df.dropna(how='all', inplace=True)
+          if before - len(df):
+              changes.append(f'Dropped {before-len(df)} empty rows')
+
+      # 4. Remove duplicates
+      if rules.get('remove_duplicates', True):
+          before = len(df)
+          df.drop_duplicates(inplace=True)
+          if before - len(df):
+              changes.append(f'Removed {before-len(df)} duplicates')
+
+      # 5. Standardize column names (lowercase + underscores)
+      if rules.get('standardize_columns', True):
+          df.columns = [c.lower().strip().replace(' ', '_')
+                        .replace('-', '_') for c in df.columns]
+          changes.append('Standardized column names')
+
+      # Save cleaned file
+      cleaned_path = info['file_path'].replace('.csv', '_cleaned.csv')
+      df.to_csv(cleaned_path, index=False)
+
+      return {
+          'rows_before': rows_before,
+          'rows_after': len(df),
+          'rows_removed': rows_before - len(df),
+          'changes': changes,
+      }
+─────────────────────────────────────────────────────────────────────────────
+
+
+================================================================================
+17. CONCEPT: CONVERSATIONAL COMMAND AGENT (FOLLOW-UP QUESTIONS)
+================================================================================
+
+WHAT IT IS:
+  The Command Agent uses a different pattern from the other agents. Instead
+  of GPT-4o function calling, it uses structured JSON output where the LLM
+  controls the entire conversation flow:
+    - Detects intent from natural language
+    - Identifies missing required fields
+    - Asks ONE follow-up question at a time
+    - Presents a confirmation summary
+    - Executes only after explicit approval
+
+ACTION EXECUTORS (from command_agent_endpoints.py):
+─────────────────────────────────────────────────────────────────────────────
+  def _execute_action(action):
+      """Execute a confirmed action against the database."""
+      intent = action.get('intent', '')
+      params = action.get('params', {})
+
+      if intent == 'create_project':
+          return _exec_create_project(params)
+      elif intent == 'update_project':
+          return _exec_update_project(params)
+      elif intent == 'create_task':
+          return _exec_create_task(params)
+      elif intent == 'update_task':
+          return _exec_update_task(params)
+      elif intent == 'assign_task':
+          return _exec_assign_task(params)
+      elif intent == 'list_projects':
+          return _exec_list_projects(params)
+      elif intent == 'list_tasks':
+          return _exec_list_tasks(params)
+      elif intent == 'list_users':
+          return _exec_list_users(params)
+      elif intent == 'add_checklist':
+          return _exec_add_checklist(params)
+      elif intent == 'update_checklist':
+          return _exec_update_checklist(params)
+      elif intent == 'update_phase':
+          return _exec_update_phase(params)
+      elif intent == 'update_transformation':
+          return _exec_update_transformation(params)
+      elif intent == 'update_uat':
+          return _exec_update_uat(params)
+      elif intent == 'update_product':
+          return _exec_update_product(params)
+      else:
+          return {'success': False, 'error': f'Unknown intent: {intent}'}
+
+  # Example: create task
+  def _exec_create_task(p):
+      project = _resolve_project(p.get('project'))
+      if not project:
+          return {'error': f'Project not found: {p.get("project")}'}
+      title = p.get('title', '').strip()
+      if not title:
+          return {'error': 'Task title is required'}
+      assignee = _resolve_user(p.get('assignee'))
+      assignee_id = assignee['id'] if assignee else None
+
+      # Generate task code
+      row = _query("SELECT COUNT(*) AS c FROM tasks WHERE project_id=%s",
+                   (project['id'],), fetch='one')
+      code = f"{project['code']}-T{(row['c'] + 1):02d}"
+
+      result = _query(
+          """INSERT INTO tasks (code, project_id, title, description,
+             assignee_id, status, start_date, end_date, assigned_by,
+             recurrence_type, recurrence_days)
+             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+             RETURNING *""",
+          (code, project['id'], title, p.get('description'),
+           assignee_id, p.get('status', 'todo'),
+           p.get('start_date'), p.get('end_date'),
+           assignee_id, p.get('recurrence_type', 'none'),
+           p.get('recurrence_days')),
+          fetch='one')
+
+      return {'success': True, 'message': f'Task "{title}" created ({code})'}
+─────────────────────────────────────────────────────────────────────────────
+
+
+================================================================================
+18. CONCEPT: FRONTEND CHAT UI PATTERNS
+================================================================================
+
+WHAT IT IS:
+  The frontend implements several patterns for agentic chat interfaces:
+  - Suggestion chips (pre-built prompts users can click)
+  - Message bubbles with role-based styling (user vs agent)
+  - Status badges (Needs Info, Confirm?, Done, Error)
+  - Inline data tables for query results
+  - Confirmation buttons embedded in messages
+  - Loading indicators (typing dots animation)
+  - Markdown table rendering
+  - Export buttons (Excel, TXT)
+
+CODE (Suggestion chips — CommandAgentPage.jsx):
+─────────────────────────────────────────────────────────────────────────────
+  const SUGGESTIONS = [
+    { label: 'Create a new project',
+      desc: 'Start a new BPM project with team assignments', icon: '+' },
+    { label: 'Assign a task to Priya Sharma',
+      desc: 'Delegate work to a team member', icon: '>' },
+    { label: 'Show all in-progress tasks',
+      desc: 'View tasks currently being worked on', icon: '?' },
+    { label: 'Add a checklist item to Phase 3',
+      desc: 'Add work items to workflow phases', icon: '#' },
+  ];
+
+  // Rendered as clickable cards:
+  {SUGGESTIONS.map((s, i) => (
+    <button key={i} onClick={() => send(s.label)} style={{...}}>
+      <span>{s.icon}</span>
+      <div>{s.label}</div>
+      <div>{s.desc}</div>
+    </button>
+  ))}
+─────────────────────────────────────────────────────────────────────────────
+
+CODE (Status badges — CommandAgentPage.jsx):
+─────────────────────────────────────────────────────────────────────────────
+  function StatusBadge({ type }) {
+    const map = {
+      question:     { bg: '#EFF6FF', color: '#1D4ED8', label: 'Needs Info' },
+      confirmation: { bg: '#FFF7ED', color: '#C2410C', label: 'Confirm?' },
+      result:       { bg: '#F0FDF4', color: '#15803D', label: 'Done' },
+      info:         { bg: '#F8FAFC', color: '#475569', label: 'Info' },
+      error:        { bg: '#FEF2F2', color: '#DC2626', label: 'Error' },
+    };
+    const s = map[type] || map.info;
+    return <span style={{
+      fontSize: 10, fontWeight: 700, padding: '2px 8px',
+      borderRadius: 10, background: s.bg, color: s.color,
+      textTransform: 'uppercase',
+    }}>{s.label}</span>;
+  }
+─────────────────────────────────────────────────────────────────────────────
+
+CODE (Pending action state management — CommandAgentPage.jsx):
+─────────────────────────────────────────────────────────────────────────────
+  const [pendingAction, setPendingAction] = useState(null);
+
+  // After receiving agent response:
+  if (type === 'confirmation' && data.action) {
+      setPendingAction(data.action);    // Store the pending action
+  } else if (type === 'result') {
+      setPendingAction(null);           // Clear after execution
+  }
+
+  // Confirm/Cancel handlers:
+  const handleConfirm = () => send('yes');
+  const handleCancel = () => {
+      setPendingAction(null);
+      send('cancel');
+  };
+
+  // Send with pending action context:
+  body: JSON.stringify({
+      message: msg,
+      history: newHistory,
+      pending_action: pendingAction,    // <-- sent to backend
+  })
+─────────────────────────────────────────────────────────────────────────────
+
+
+================================================================================
+19. FULL CODE LISTING — ALL AGENT FILES
+================================================================================
+
+The complete agent implementation spans these files:
+
+BACKEND (Python/Flask):
+  backend/agent_tools.py         — Tool functions + OpenAI function schemas
+  backend/agent_service.py       — AgentService class (orchestration)
+  backend/agent_endpoints.py     — Flask routes (/chat, /confirm, /reject)
+  backend/data_agent_tools.py    — Data management tool functions
+  backend/data_agent_service.py  — DataManagementService class
+  backend/data_agent_endpoints.py — Data agent Flask routes
+  backend/command_agent_endpoints.py — Command agent (intent + execution)
+
+FRONTEND (React):
+  frontend/src/pages/CommandAgentPage.jsx   — Command agent chat UI
+  frontend/src/pages/AgentDescriptionsPage.jsx — Agent descriptions/selector
+  frontend/src/pages/OcrAgentPage.jsx       — Document analysis chat UI
+
+ROUTING (in app.py):
+  /api/agent/*          → agent_bp         (CRUD Operations Agent)
+  /api/data-agent/*     → data_agent_bp    (Data Management Agent)
+  /api/command-agent/*  → cmd_agent_bp     (Command Agent)
+  /api/ocr/*            → ocr_bp           (OCR/Document Analysis)
+
+
+================================================================================
+SUMMARY OF ALL AGENTIC CONCEPTS
+================================================================================
+
+┌──────────────────────────────────┬───────────────────────────────────────────┐
+│ CONCEPT                          │ WHERE USED                                │
+├──────────────────────────────────┼───────────────────────────────────────────┤
+│ LLM Function Calling (Tool Use)  │ CRUD Agent, Data Agent                    │
+│ System Prompts & Context         │ All 3 agents                              │
+│ Tool Definitions (JSON Schema)   │ CRUD Agent (4 tools), Data Agent (5 tools)│
+│ Tool Dispatch & Execution        │ CRUD Agent, Data Agent                    │
+│ Intent Detection & Extraction    │ Command Agent                             │
+│ Entity Resolution (Fuzzy Match)  │ Command Agent                             │
+│ Multi-Turn Conversation          │ All 3 agents                              │
+│ Human-in-the-Loop Confirmation   │ All 3 agents                              │
+│ Pending Writes & TTL Expiry      │ CRUD Agent, Data Agent                    │
+│ Diff Preview (Before/After)      │ CRUD Agent                                │
+│ Audit Logging                    │ CRUD Agent, Data Agent                    │
+│ Guardrails & Safety              │ All 3 agents                              │
+│ NL2SQL (Natural Language to SQL) │ Reconciliation Tool, Compare Tool         │
+│ Document Intelligence (RAG-lite) │ OCR Tool                                  │
+│ Proactive Alerts (Autonomous)    │ Alerts Tool                               │
+│ Data Pipeline (ETL)              │ Data Agent                                │
+│ Structured JSON Output           │ Command Agent                             │
+│ Follow-Up Questions              │ Command Agent                             │
+│ Frontend Chat UI Patterns        │ CommandAgentPage, OcrAgentPage            │
+│ Suggestion Chips                 │ CommandAgentPage, OcrAgentPage            │
+│ Status Badges                    │ CommandAgentPage                           │
+│ Confirmation Buttons in Chat     │ CommandAgentPage                           │
+│ Export (Excel/TXT)               │ OcrAgentPage                              │
+└──────────────────────────────────┴───────────────────────────────────────────┘
+
+================================================================================
+END OF DOCUMENT
+================================================================================

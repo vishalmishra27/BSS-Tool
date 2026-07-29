@@ -67,13 +67,13 @@ const scrollbarStyles = `
   }
 
   .workflow-main::-webkit-scrollbar-thumb {
-    background: linear-gradient(45deg, #003087, #0066CC);
+    background: linear-gradient(45deg, #00338D, #0091DA);
     border-radius: 10px;
     border: 1px solid #E0E8F0;
   }
 
   .workflow-main::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(45deg, #001F5B, #003087);
+    background: linear-gradient(45deg, #001F5B, #00338D);
   }
 
   /* Horizontal scrollbar for workflow nodes */
@@ -88,13 +88,13 @@ const scrollbarStyles = `
   }
 
   .workflow-nodes-container::-webkit-scrollbar-thumb {
-    background: linear-gradient(90deg, #0066CC, #003087);
+    background: linear-gradient(90deg, #0091DA, #00338D);
     border-radius: 8px;
     border: 1px solid #E0E8F0;
   }
 
   .workflow-nodes-container::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(90deg, #003087, #001F5B);
+    background: linear-gradient(90deg, #00338D, #001F5B);
   }
 
   /* Checklist scrollbar */
@@ -119,12 +119,12 @@ const scrollbarStyles = `
   /* Firefox scrollbar support */
   .workflow-main {
     scrollbar-width: thin;
-    scrollbar-color: #003087 #E0E8F0;
+    scrollbar-color: #00338D #E0E8F0;
   }
 
   .workflow-nodes-container {
     scrollbar-width: thin;
-    scrollbar-color: #0066CC #E0E8F0;
+    scrollbar-color: #0091DA #E0E8F0;
   }
 `;
 
@@ -149,12 +149,28 @@ const WorkflowPage = () => {
     };
   }, []);
 
+  // Derive visual status from checklist completion + end date
+  const deriveStatus = (phase) => {
+    const total = phase.checklist_total || 0;
+    const done = phase.checklist_done || 0;
+    const allComplete = total > 0 && done === total;
+    const anyStarted = done > 0;
+    const endDate = phase.end_dt ? new Date(phase.end_dt) : null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (allComplete) return 'completed';
+    if (endDate && endDate < today && !allComplete) return 'overdue';
+    if (phase.curr_status === 'current' || anyStarted) return 'current';
+    return 'pending';
+  };
+
   // Fetch phases from backend (same source as workflow & dashboard)
   useEffect(() => {
     const fetchPhases = async () => {
       try {
         setLoading(true);
-        const response = await fetch('/api/phases');
+        const response = await fetch('/api/phases/summary');
         if (!response.ok) throw new Error('Failed to fetch phases');
         const phasesData = await response.json();
 
@@ -164,10 +180,12 @@ const WorkflowPage = () => {
           .map(phase => ({
             id: phase.phase_id,
             label: PHASE_NAMES[phase.phase_id] || phase.phase_id,
-            status: phase.curr_status === 'complete' ? 'completed' : phase.curr_status,
+            status: deriveStatus(phase),
             start_dt: phase.start_dt,
             end_dt: phase.end_dt,
             assigned_to: phase.assigned_to,
+            checklist_total: phase.checklist_total,
+            checklist_done: phase.checklist_done,
             checklist: [],
           }));
 
@@ -342,16 +360,21 @@ const handleNodeClick = (node) => {
           ch_id: item.ch_id
         }));
 
-        // Determine node status based on checklist completion
+        // Determine node status based on checklist completion + end date
         let updatedStatus = node.status;
         if (checklistItems && checklistItems.length > 0) {
           const allCompleted = checklistItems.every(item => item.status === 'complete' || item.status === 'completed');
           const anyCompleted = checklistItems.some(item => item.status === 'complete' || item.status === 'completed');
+          const endDate = node.end_dt ? new Date(node.end_dt) : null;
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
 
           if (allCompleted) {
             updatedStatus = 'completed';
+          } else if (endDate && endDate < today) {
+            updatedStatus = 'overdue';
           } else if (anyCompleted) {
-            updatedStatus = 'current'; // or 'in-progress'
+            updatedStatus = 'current';
           } else {
             updatedStatus = 'pending';
           }
@@ -473,6 +496,7 @@ const handleNodeClick = (node) => {
 
   const getNodeColor = (status) => {
     if (status === 'completed') return 'bg-gradient-to-r from-green-500 to-green-600';
+    if (status === 'overdue') return 'bg-gradient-to-r from-red-500 to-red-600';
     if (status === 'current') return 'bg-gradient-to-r from-yellow-500 to-yellow-600';
     return 'bg-gradient-to-r from-gray-400 to-gray-500 text-gray-800';
   };
@@ -543,10 +567,12 @@ const handleNodeClick = (node) => {
                    
                     <div className={`absolute -top-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${
                       node.status === 'completed' ? 'bg-green-600 text-white' :
+                      node.status === 'overdue' ? 'bg-red-600 text-white' :
                       node.status === 'current' ? 'bg-yellow-600 text-white' :
                       'bg-gray-600 text-white'
                     }`}>
                       {node.status === 'completed' ? '✓' :
+                       node.status === 'overdue' ? '!' :
                        node.status === 'current' ? '●' :
                        index + 1}
                     </div>
@@ -554,7 +580,7 @@ const handleNodeClick = (node) => {
                  
                   {index < filteredNodes.length - 1 && (
                     <div className="flex items-center justify-center">
-                      <div className="w-8 h-1 bg-gradient-to-r from-[#4178d9] to-[#60a5fa] relative flex-shrink-0 rounded-full">
+                      <div className="w-8 h-1 bg-gradient-to-r from-[#0091DA] to-[#0091DA] relative flex-shrink-0 rounded-full">
                         <ArrowRight size={16} className="text-white absolute right-[-8px] top-1/2 -translate-y-1/2" />
                       </div>
                     </div>
@@ -570,14 +596,14 @@ const handleNodeClick = (node) => {
             <div className="max-w-7xl mx-auto mb-8">
               <div className="text-center mb-8">
                 <h2 className="text-2xl font-bold text-[#001F5B] mb-2">{selectedNode.label}</h2>
-                <div className="w-24 h-1 bg-gradient-to-r from-[#003087] to-[#0066CC] mx-auto rounded-full"></div>
+                <div className="w-24 h-1 bg-gradient-to-r from-[#00338D] to-[#0091DA] mx-auto rounded-full"></div>
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
 
                 <div className="bg-white rounded-2xl p-8 shadow-sm border border-[#E0E8F0]">
                   <div className="flex items-center mb-6">
-                    <div className="w-8 h-8 bg-gradient-to-r from-[#003087] to-[#0066CC] rounded-lg flex items-center justify-center mr-3">
+                    <div className="w-8 h-8 bg-gradient-to-r from-[#00338D] to-[#0091DA] rounded-lg flex items-center justify-center mr-3">
                       <span className="text-white text-sm font-bold">📋</span>
                     </div>
                     <h3 className="text-xl font-semibold text-[#001F5B]">Phase Details</h3>
@@ -605,7 +631,7 @@ const handleNodeClick = (node) => {
 
                 <div className="bg-white rounded-2xl p-8 shadow-sm border border-[#E0E8F0] flex flex-col">
                   <div className="flex items-center mb-6">
-                    <div className="w-8 h-8 bg-gradient-to-r from-[#16A34A] to-[#0066CC] rounded-lg flex items-center justify-center mr-3">
+                    <div className="w-8 h-8 bg-gradient-to-r from-[#16A34A] to-[#0091DA] rounded-lg flex items-center justify-center mr-3">
                       <span className="text-white text-sm font-bold">✓</span>
                     </div>
                     <h3 className="text-xl font-semibold text-[#001F5B]">{selectedNode.label}: Checklist</h3>

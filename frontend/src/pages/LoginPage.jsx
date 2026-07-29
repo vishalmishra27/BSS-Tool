@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import logo from '../public/logo.png';
 
 const ROLE_LABELS = {
   programme_director: 'Programme Director',
@@ -13,8 +14,8 @@ const ROLE_LABELS = {
 
 const ROLE_COLOURS = {
   programme_director: '#001F5B',
-  engagement_manager: '#003087',
-  bss_consultant:     '#0070c0',
+  engagement_manager: '#00338D',
+  bss_consultant:     '#0091DA',
   qa_manager:         '#006600',
   data_analyst:       '#555',
   client_sponsor:     '#7a2800',
@@ -54,19 +55,26 @@ export default function LoginPage({ onLogin }) {
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #001024 0%, #001F5B 50%, #003087 100%)',
+      background: 'linear-gradient(135deg, #001024 0%, #001F5B 50%, #00338D 100%)',
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
       fontFamily: 'system-ui, sans-serif', padding: 20,
     }}>
       {/* KPMG Header */}
       <div style={{ marginBottom: 32, textAlign: 'center' }}>
-        <div style={{
-          display: 'inline-block',
-          background: '#003087', color: '#00B0F0',
-          fontWeight: 900, fontSize: 32, letterSpacing: 4,
-          padding: '6px 18px', border: '3px solid #00B0F0',
-          marginBottom: 12,
-        }}>KPMG</div>
+        <img
+          src={logo}
+          alt="KPMG Logo"
+          style={{
+            height: 60,
+            width: 'auto',
+            objectFit: 'contain',
+            display: 'block',
+            margin: '0 auto 16px',
+            background: '#fff',
+            borderRadius: 8,
+            padding: '10px 20px',
+          }}
+        />
         <div style={{ color: 'rgba(255,255,255,0.9)', fontSize: 18, fontWeight: 600 }}>BSS Migration Assurance Tool</div>
         <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, marginTop: 4 }}>Agentic AI-Powered Project Intelligence Platform</div>
       </div>

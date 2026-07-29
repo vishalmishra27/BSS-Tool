@@ -317,6 +317,33 @@ def _get_checklist_progress():
         progress[r['phase_id']] = round(done / total * 100, 1) if total else 0
     return progress
 
+
+@app.route('/api/phases/summary')
+def phases_summary():
+    """Return phases enriched with checklist completion counts for status derivation."""
+    try:
+        phases = query("SELECT * FROM phases ORDER BY phase_id")
+        checklist_stats = query("""
+            SELECT phase_id,
+                   COUNT(*) AS total,
+                   COUNT(*) FILTER (WHERE status = 'complete') AS done
+            FROM checklist
+            GROUP BY phase_id
+        """)
+        stats_map = {r['phase_id']: {'total': int(r['total']), 'done': int(r['done'])} for r in checklist_stats}
+        result = []
+        for p in phases:
+            pid = p['phase_id']
+            s = stats_map.get(pid, {'total': 0, 'done': 0})
+            result.append({
+                **dict(p),
+                'checklist_total': s['total'],
+                'checklist_done': s['done'],
+            })
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 # ─── Transformation Dashboard (split endpoints) ─────────────────────────────
 @app.route('/api/project_overview')
 def get_project_overview():
@@ -734,6 +761,15 @@ try:
     logger.info("Data Management blueprint registered at /api/data-agent")
 except Exception as e:
     logger.warning(f"Data Management blueprint unavailable: {e}")
+
+# ─── Command Agent (prompt-based project/task/workflow management) ────────
+try:
+    from command_agent_endpoints import cmd_agent_bp, init_command_agent
+    init_command_agent(query)
+    app.register_blueprint(cmd_agent_bp, url_prefix='/api/command-agent')
+    logger.info("Command Agent blueprint registered at /api/command-agent")
+except Exception as e:
+    logger.warning(f"Command Agent blueprint unavailable: {e}")
 
 # PDF analysis function (moved from old agent_service)
 def analyse_pdf_with_claude(base64_content, media_type, filename):

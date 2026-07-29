@@ -301,7 +301,7 @@ const AllTasks = () => {
       display: 'inline-block'
     },
     priorityLow: {
-      backgroundColor: '#3b82f6'
+      backgroundColor: '#0091DA'
     },
     priorityMedium: {
       backgroundColor: '#f97316'

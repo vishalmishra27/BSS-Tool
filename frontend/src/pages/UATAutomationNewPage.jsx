@@ -421,19 +421,19 @@ export default function UATAutomationNewPage() {
               {statusData && (
                 <>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                    <div className="bg-gradient-to-br from-[#004fd9] to-[#00338d] p-5 rounded-lg text-white shadow-lg">
+                    <div className="bg-gradient-to-br from-[#00338D] to-[#002266] p-5 rounded-lg text-white shadow-lg">
                       <p className="text-xs uppercase opacity-80">Total Steps</p>
                       <p className="text-3xl font-bold">{statusData.total_steps || 0}</p>
                     </div>
-                    <div className="bg-gradient-to-br from-[#004fd9] to-[#00338d] p-5 rounded-lg text-white shadow-lg">
+                    <div className="bg-gradient-to-br from-[#00338D] to-[#002266] p-5 rounded-lg text-white shadow-lg">
                       <p className="text-xs uppercase opacity-80">Completed</p>
                       <p className="text-3xl font-bold">{statusData.completed_steps || 0}</p>
                     </div>
-                    <div className="bg-gradient-to-br from-[#004fd9] to-[#00338d] p-5 rounded-lg text-white shadow-lg">
+                    <div className="bg-gradient-to-br from-[#00338D] to-[#002266] p-5 rounded-lg text-white shadow-lg">
                       <p className="text-xs uppercase opacity-80">Passed</p>
                       <p className="text-3xl font-bold text-green-300">{statusData.passed || 0}</p>
                     </div>
-                    <div className="bg-gradient-to-br from-[#004fd9] to-[#00338d] p-5 rounded-lg text-white shadow-lg">
+                    <div className="bg-gradient-to-br from-[#00338D] to-[#002266] p-5 rounded-lg text-white shadow-lg">
                       <p className="text-xs uppercase opacity-80">Failed</p>
                       <p className="text-3xl font-bold text-red-300">{statusData.failed || 0}</p>
                     </div>

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 
 const OP_BADGES = {
-  single_row: { label: 'Single Row', color: '#0070c0' },
+  single_row: { label: 'Single Row', color: '#0091DA' },
   bulk:        { label: 'Bulk',       color: '#e07b00' },
   delete:      { label: 'Delete',     color: '#c00000' },
 };
@@ -24,7 +24,7 @@ export default function AuditLogPage() {
     <div style={{ padding: 28, fontFamily: 'system-ui, sans-serif', maxWidth: 1100, margin: '0 auto' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 24 }}>
-        <div style={{ background: '#001F5B', color: '#00B0F0', fontWeight: 900, fontSize: 18, letterSpacing: 2, padding: '3px 10px', border: '2px solid #00B0F0' }}>KPMG</div>
+        <div style={{ background: '#001F5B', color: '#0091DA', fontWeight: 900, fontSize: 18, letterSpacing: 2, padding: '3px 10px', border: '2px solid #0091DA' }}>KPMG</div>
         <div>
           <h1 style={{ margin: 0, fontSize: 20, color: '#001F5B', fontWeight: 700 }}>Agent Audit Log</h1>
           <p style={{ margin: 0, fontSize: 13, color: '#666' }}>Immutable record of all AI-assisted data changes — read-only</p>
@@ -36,7 +36,7 @@ export default function AuditLogPage() {
         {[
           { label: 'Total Operations', value: logs.length, color: '#001F5B' },
           { label: 'Bulk Operations', value: logs.filter(l => l.operation_type === 'bulk').length, color: '#e07b00' },
-          { label: 'Single Row Edits', value: logs.filter(l => l.operation_type === 'single_row').length, color: '#0070c0' },
+          { label: 'Single Row Edits', value: logs.filter(l => l.operation_type === 'single_row').length, color: '#0091DA' },
           { label: 'Rows Affected', value: logs.reduce((s, l) => s + (l.affected_rows || 0), 0), color: '#006600' },
         ].map(stat => (
           <div key={stat.label} style={{

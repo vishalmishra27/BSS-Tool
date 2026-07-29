@@ -399,12 +399,12 @@ const TransformationDashboardStatic = () => {
       marginBottom: '1.5rem',
     },
     kpiCard: {
-      background: 'linear-gradient(90deg, #003087 0%, #0066CC 100%)',
+      background: 'linear-gradient(90deg, #00338D 0%, #0066CC 100%)',
       borderRadius: '12px',
       padding: '1.5rem',
       marginBottom: '1.5rem',
       boxShadow: '0 4px 20px rgba(0, 48, 135, 0.25)',
-      border: '1px solid #003087',
+      border: '1px solid #00338D',
       transition: 'transform 0.3s ease, box-shadow 0.3s ease',
       color: '#ffffff',
       position: 'relative',
@@ -475,8 +475,8 @@ const TransformationDashboardStatic = () => {
       fontSize: '1.4rem',
       fontWeight: '600',
       marginBottom: '1rem',
-      color: '#1e40af',
-      borderBottom: '2px solid #3b82f6',
+      color: '#00338D',
+      borderBottom: '2px solid #0091DA',
       paddingBottom: '0.5rem',
     },
     tableContainer: {
@@ -493,7 +493,7 @@ const TransformationDashboardStatic = () => {
       minWidth: '1000px',
     },
     tableHeader: {
-      background: 'linear-gradient(135deg, #1e40af, #3b82f6)',
+      background: 'linear-gradient(135deg, #00338D, #0091DA)',
       color: '#ffffff',
     },
     tableHeaderCell: {
@@ -502,7 +502,7 @@ const TransformationDashboardStatic = () => {
       fontWeight: '600',
       fontSize: '0.9rem',
       color: '#ffffff',
-      borderBottom: '2px solid #1e40af',
+      borderBottom: '2px solid #00338D',
       whiteSpace: 'normal',
       wordBreak: 'break-word',
       lineHeight: '1.2',
@@ -513,7 +513,7 @@ const TransformationDashboardStatic = () => {
       fontWeight: '600',
       fontSize: '0.9rem',
       color: '#ffffff',
-      borderBottom: '2px solid #1e40af',
+      borderBottom: '2px solid #00338D',
       whiteSpace: 'normal',
       wordBreak: 'break-word',
       lineHeight: '1.2',
@@ -549,7 +549,7 @@ const TransformationDashboardStatic = () => {
       fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
     },
     lobHeaderGroup: {
-      background: 'linear-gradient(135deg, #1e40af, #3b82f6)',
+      background: 'linear-gradient(135deg, #00338D, #0091DA)',
       color: '#ffffff',
       padding: '1rem 0.5rem',
       fontWeight: '700',
@@ -561,7 +561,7 @@ const TransformationDashboardStatic = () => {
       lineHeight: '1.2',
     },
     lobHeaderGroupLast: {
-      background: 'linear-gradient(135deg, #1e40af, #3b82f6)',
+      background: 'linear-gradient(135deg, #00338D, #0091DA)',
       color: '#ffffff',
       padding: '1rem 0.5rem',
       fontWeight: '700',
@@ -579,7 +579,7 @@ const TransformationDashboardStatic = () => {
       padding: '0.75rem 0.5rem',
       fontSize: '0.8rem',
       fontWeight: '600',
-      color: '#1e40af',
+      color: '#00338D',
       textAlign: 'center',
       borderRight: '1px solid #e2e8f0',
       backgroundColor: '#f8fafc',
@@ -592,7 +592,7 @@ const TransformationDashboardStatic = () => {
       padding: '0.75rem 0.5rem',
       fontSize: '0.8rem',
       fontWeight: '600',
-      color: '#1e40af',
+      color: '#00338D',
       textAlign: 'left',
       paddingLeft: '0.75rem',
       borderRight: '1px solid #e2e8f0',
@@ -606,7 +606,7 @@ const TransformationDashboardStatic = () => {
       padding: '0.75rem 0.5rem',
       fontSize: '0.8rem',
       fontWeight: '600',
-      color: '#1e40af',
+      color: '#00338D',
       textAlign: 'center',
       backgroundColor: '#f8fafc',
       whiteSpace: 'normal',
@@ -616,12 +616,12 @@ const TransformationDashboardStatic = () => {
     },
     plannedBox: {
       backgroundColor: '#dbeafe',
-      border: '1px solid #3b82f6',
+      border: '1px solid #0091DA',
       borderRadius: '6px',
       padding: '0.4rem 0.5rem',
       fontSize: '0.8rem',
       fontWeight: '600',
-      color: '#1e40af',
+      color: '#00338D',
       minWidth: '40px',
       display: 'inline-block',
     },
@@ -686,7 +686,7 @@ const TransformationDashboardStatic = () => {
       fontSize: '1.1rem',
       fontWeight: '600',
       marginBottom: '0.5rem',
-      color: '#1e40af',
+      color: '#00338D',
     },
     lobProgress: {
       fontSize: '1.5rem',
@@ -953,13 +953,13 @@ const TransformationDashboardStatic = () => {
             justifyContent: 'space-between',
             alignItems: 'center',
             marginBottom: '1rem',
-            borderBottom: '2px solid #3b82f6',
+            borderBottom: '2px solid #0091DA',
             paddingBottom: '0.5rem',
           }}>
             <h3 style={{
               fontSize: '1.2rem',
               fontWeight: '700',
-              color: '#1e40af',
+              color: '#00338D',
               margin: 0,
             }}>
               {hoveredActivity.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ')}
@@ -1047,7 +1047,7 @@ const TransformationDashboardStatic = () => {
                   if (status === 'completed') {
                     statusColor = '#16a34a';
                   } else if (status === 'in-progress' || status === 'review') {
-                    statusColor = '#3b82f6';
+                    statusColor = '#0091DA';
                   } else if (status === 'overdue') {
                     statusColor = '#ef4444';
                   }

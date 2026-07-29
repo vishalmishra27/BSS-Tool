@@ -433,7 +433,7 @@ const StatCard = ({ title, value, change, icon: Icon, chartData, chartType, onCl
   const chartColor = '#ffffff';
   return (
     <div
-      className="bg-gradient-to-br from-[#004fd9] to-[#00338d] p-6 rounded-lg text-white shadow-lg transition-transform hover:-translate-y-1 cursor-pointer"
+      className="bg-gradient-to-br from-[#00338D] to-[#00338d] p-6 rounded-lg text-white shadow-lg transition-transform hover:-translate-y-1 cursor-pointer"
       onClick={onClick}
     >
       <div className="flex justify-between items-center">
@@ -490,12 +490,12 @@ const SalesSummaryChart = () => (
         <AreaChart data={salesData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
           <defs>
             <linearGradient id="colorUv" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#004fd9" stopOpacity={0.8} />
-              <stop offset="95%" stopColor="#004fd9" stopOpacity={0} />
+              <stop offset="5%" stopColor="#00338D" stopOpacity={0.8} />
+              <stop offset="95%" stopColor="#00338D" stopOpacity={0} />
             </linearGradient>
             <linearGradient id="colorPv" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#4178d9" stopOpacity={0.8} />
-              <stop offset="95%" stopColor="#4178d9" stopOpacity={0} />
+              <stop offset="5%" stopColor="#0091DA" stopOpacity={0.8} />
+              <stop offset="95%" stopColor="#0091DA" stopOpacity={0} />
             </linearGradient>
           </defs>
           <XAxis dataKey="name" />
@@ -566,7 +566,7 @@ const ActivityFeed = () => (
       {activityFeed.map((activity, index) => (
         <li key={index} className="flex items-start py-3 border-b border-gray-100 last:border-b-0">
           <div className="mr-3 mt-1">
-            <span className="flex items-center justify-center h-8 w-8 rounded-full bg-[#e0e8f9] text-[#004fd9]">
+            <span className="flex items-center justify-center h-8 w-8 rounded-full bg-[#e0e8f9] text-[#00338D]">
               {index % 2 === 0 ? <CheckCircle size={16} /> : <Clock size={16} />}
             </span>
           </div>
