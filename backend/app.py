@@ -708,6 +708,13 @@ def list_users():
         return jsonify({'error': str(e)}), 500
 
 
+# ─── Migration dashboard tables (phases / checklist / products / uat_cases / etc.) ─
+try:
+    from dashboard_schema import ensure_dashboard_schema
+    ensure_dashboard_schema(query)  # idempotent CREATE TABLE IF NOT EXISTS on boot
+except Exception as e:
+    logger.warning(f"Dashboard schema init failed: {e}")
+
 # ─── BPM (projects / tasks / user management) ────────────────────────────────
 try:
     from bpm_endpoints import bpm_bp, init_bpm, ensure_bpm_schema
