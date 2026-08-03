@@ -108,3 +108,11 @@ temp/
 .cache/
 *.tmp
 *.swp
+
+# =========================
+# Uploads / Screenshots
+# =========================
+backend/uat_screenshots/
+backend/uat_uploads/
+backend/uploads/
+email_screenshots/
